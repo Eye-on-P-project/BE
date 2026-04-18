@@ -29,29 +29,61 @@ public interface AuthControllerSpec {
     @Operation(
             summary = "회원가입",
             description = """
-                    이메일과 비밀번호로 회원가입합니다.
+                    **[ 회원가입 API ]**
+                    이메일과 비밀번호, 사용자 부가 정보를 입력받아 회원가입을 진행합니다.
                     
-                    - **WEB 클라이언트**: `X-Client-Type: WEB` 헤더 전송 시 refreshToken은 HttpOnly 쿠키로 설정됩니다.
-                    - **MOBILE 클라이언트**: refreshToken이 응답 바디에 포함됩니다.
+                    ### 📥 **입력 (Input)**
+                    - `email` (필수): 사용자 이메일 (예: user@example.com)
+                    - `password` (필수): 4~72자의 비밀번호
+                    - `organizationCode` (선택): 소속 기관 코드 (예: ORG001)
+                    - `name` (선택): 사용자 본명 (예: 홍길동)
+                    - `nickname` (선택): 서비스에서 사용할 닉네임 (예: 길동이)
+                    - `age` (선택): 1~120 사이의 나이
+                    - `gender` (선택): 성별 (MALE, FEMALE, 등)
+                    
+                    ### 📤 **출력 (Output)**
+                    - `userId`: 생성된 사용자의 고유 ID (문자열 형태의 TSID)
+                    - `accessToken`: API 요청 인증에 사용될 토큰
+                    - `refreshToken`: AccessToken 갱신을 위한 토큰
+                    - `role`: 사용자 권한 (ROLE_USER 등)
+                    
+                    **[ 클라이언트 타입에 따른 처리 ]**
+                    - **WEB 클라이언트 (`X-Client-Type: WEB`)**: refreshToken이 응답 바디가 아닌 `HttpOnly` 쿠키로 설정됩니다.
+                    - **MOBILE 클라이언트 (`X-Client-Type: MOBILE` 또는 미입력)**: refreshToken이 응답 바디에 포함됩니다.
                     """
     )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
                     description = "회원가입 성공",
-                    content = @Content(schema = @Schema(implementation = AuthTokenResponse.class))
+                    content = @Content(
+                            schema = @Schema(implementation = AuthTokenResponse.class),
+                            examples = @ExampleObject(
+                                    name = "signupSuccessExample",
+                                    summary = "회원가입 완료 응답",
+                                    value = """
+                                            {
+                                              "userId": "123456789012345678",
+                                              "accessToken": "eyJhbGciOi...",
+                                              "refreshToken": "eyJhbGciOi...",
+                                              "role": "ROLE_USER"
+                                            }
+                                            """
+                            )
+                    )
             ),
-            @ApiResponse(responseCode = "400", description = "유효성 검증 실패 (이메일 형식 오류, 비밀번호 길이 등)"),
+            @ApiResponse(responseCode = "400", description = "유효성 검증 실패 (이메일 누락, 비밀번호 길이 미달 등)"),
             @ApiResponse(responseCode = "409", description = "이미 존재하는 이메일")
     })
     AuthTokenResponse signup(
             @RequestBody(
                     required = true,
+                    description = "회원가입에 필요한 정보 (이메일 및 비밀번호 필수)",
                     content = @Content(
                             schema = @Schema(implementation = SignupRequest.class),
                             examples = @ExampleObject(
-                                    name = "signupExample",
-                                    summary = "회원가입 예시",
+                                    name = "signupRequestExample",
+                                    summary = "회원가입 요청 모델",
                                     value = """
                                             {
                                               "email": "user@example.com",
@@ -70,7 +102,7 @@ public interface AuthControllerSpec {
 
             @Parameter(
                     name = "X-Client-Type",
-                    description = "클라이언트 타입 (WEB | MOBILE). 미입력 시 MOBILE로 처리됩니다.",
+                    description = "클라이언트 환경을 구분하는 헤더 (WEB | MOBILE). 기본값: MOBILE",
                     in = ParameterIn.HEADER,
                     schema = @Schema(type = "string", allowableValues = {"WEB", "MOBILE"}),
                     example = "WEB"
@@ -83,29 +115,56 @@ public interface AuthControllerSpec {
     @Operation(
             summary = "로그인",
             description = """
-                    이메일과 비밀번호로 로그인합니다.
+                    **[ 로그인 API ]**
+                    기존 회원의 이메일과 비밀번호로 인증하여 토큰을 발급받습니다.
                     
-                    - **WEB 클라이언트**: refreshToken이 HttpOnly 쿠키로 설정됩니다.
-                    - **MOBILE 클라이언트**: refreshToken이 응답 바디에 포함됩니다.
+                    ### 📥 **입력 (Input)**
+                    - `email` (필수): 가입 시 사용한 이메일
+                    - `password` (필수): 사용자 비밀번호
+                    
+                    ### 📤 **출력 (Output)**
+                    - `userId`: 로그인한 사용자의 ID (문자열 형태)
+                    - `accessToken`: API 요청 인증용 JWT 접근 토큰
+                    - `refreshToken`: 토큰 갱신용 Refresh 토큰
+                    - `role`: 사용자 권한
+                    
+                    **[ 클라이언트 타입에 따른 처리 ]**
+                    - **WEB 클라이언트**: refreshToken이 `HttpOnly` 쿠키에 담겨 반환됩니다. (보안 강화)
+                    - **MOBILE 클라이언트**: refreshToken이 응답 바디의 JSON에 포함됩니다.
                     """
     )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
-                    description = "로그인 성공",
-                    content = @Content(schema = @Schema(implementation = AuthTokenResponse.class))
+                    description = "로그인 성공 및 토큰 반환",
+                    content = @Content(
+                            schema = @Schema(implementation = AuthTokenResponse.class),
+                            examples = @ExampleObject(
+                                    name = "loginSuccessExample",
+                                    summary = "로그인 성공 응답 예시",
+                                    value = """
+                                            {
+                                              "userId": "123456789012345678",
+                                              "accessToken": "eyJhbGciOi...",
+                                              "refreshToken": "eyJhbGciOi...",
+                                              "role": "ROLE_USER"
+                                            }
+                                            """
+                            )
+                    )
             ),
-            @ApiResponse(responseCode = "400", description = "유효성 검증 실패"),
-            @ApiResponse(responseCode = "401", description = "이메일 또는 비밀번호 불일치")
+            @ApiResponse(responseCode = "400", description = "요청 파라미터 유효성 검증 실패"),
+            @ApiResponse(responseCode = "401", description = "이메일 또는 비밀번호가 일치하지 않음")
     })
     AuthTokenResponse login(
             @RequestBody(
                     required = true,
+                    description = "로그인 자격 증명(Credentials)",
                     content = @Content(
                             schema = @Schema(implementation = LoginRequest.class),
                             examples = @ExampleObject(
-                                    name = "loginExample",
-                                    summary = "로그인 예시",
+                                    name = "loginRequestExample",
+                                    summary = "로그인 요청 모델 예시",
                                     value = """
                                             {
                                               "email": "user@example.com",
@@ -119,7 +178,7 @@ public interface AuthControllerSpec {
 
             @Parameter(
                     name = "X-Client-Type",
-                    description = "클라이언트 타입 (WEB | MOBILE)",
+                    description = "동작 환경 설정을 위한 클라이언트 타입 (WEB | MOBILE)",
                     in = ParameterIn.HEADER,
                     schema = @Schema(type = "string", allowableValues = {"WEB", "MOBILE"}),
                     example = "WEB"
@@ -132,27 +191,48 @@ public interface AuthControllerSpec {
     @Operation(
             summary = "토큰 갱신 (Refresh)",
             description = """
-                    refreshToken을 이용해 새로운 accessToken과 refreshToken을 발급합니다.
+                    **[ 토큰 갱신 API ]**
+                    기존의 유효한 refreshToken을 이용해 새로운 accessToken과 refreshToken 쌍을 발급받습니다.
+                    만료된 accessToken 대신 이 API를 호출해야 합니다.
                     
-                    - **WEB 클라이언트**: refreshToken을 쿠키에서 자동으로 읽어옵니다. (본문 불필요)
-                    - **MOBILE 클라이언트**: 요청 바디의 `refreshToken` 필드로 전송합니다.
+                    ### 📥 **입력 (Input)**
+                    - **WEB 클라이언트**: 별도의 Request Body 없이, 자동으로 전송되는 `refreshToken` 쿠키를 이용합니다.
+                    - **MOBILE 클라이언트**: 바디의 `refreshToken` 필드에 토큰 값을 명시적으로 포함하여 전송해야 합니다.
+                    
+                    ### 📤 **출력 (Output)**
+                    - 로그인과 동일하게 `accessToken` 및 `refreshToken`이 갱신되어 반환됩니다.
                     """
     )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
-                    description = "토큰 갱신 성공",
-                    content = @Content(schema = @Schema(implementation = AuthTokenResponse.class))
+                    description = "토큰 갱신 성공 (새로운 접근/갱신 토큰 발급)",
+                    content = @Content(
+                            schema = @Schema(implementation = AuthTokenResponse.class),
+                            examples = @ExampleObject(
+                                    name = "refreshSuccessExample",
+                                    summary = "토큰 갱신 성공 응답",
+                                    value = """
+                                            {
+                                              "userId": "123456789012345678",
+                                              "accessToken": "eyJhbGciOi...new",
+                                              "refreshToken": "eyJhbGciOi...new",
+                                              "role": "ROLE_USER"
+                                            }
+                                            """
+                            )
+                    )
             ),
-            @ApiResponse(responseCode = "401", description = "유효하지 않거나 만료된 refreshToken")
+            @ApiResponse(responseCode = "401", description = "유효하지 않거나 이미 만료/삭제된 refreshToken. 다시 로그인해야 합니다.")
     })
     AuthTokenResponse refresh(
             @RequestBody(
                     required = false,
+                    description = "토큰 갱신 요청 모델 (MOBILE 환경에서는 필수)",
                     content = @Content(
                             schema = @Schema(implementation = RefreshRequest.class),
                             examples = @ExampleObject(
-                                    name = "refreshExample",
+                                    name = "refreshRequestExample",
                                     summary = "MOBILE용 refresh 예시",
                                     value = """
                                             {
@@ -166,7 +246,7 @@ public interface AuthControllerSpec {
 
             @Parameter(
                     name = "X-Client-Type",
-                    description = "클라이언트 타입 (WEB | MOBILE)",
+                    description = "토큰 획득/반환 방식을 구분하는 클라이언트 타입 (WEB | MOBILE)",
                     in = ParameterIn.HEADER,
                     schema = @Schema(type = "string", allowableValues = {"WEB", "MOBILE"}),
                     example = "MOBILE"
@@ -180,34 +260,54 @@ public interface AuthControllerSpec {
     @Operation(
             summary = "로그아웃",
             description = """
-                    accessToken을 무효화하고 refreshToken을 삭제합니다.
+                    **[ 로그아웃 API ]**
+                    현재 사용자의 세션을 종료하고 토큰을 무효화합니다.
+                    (Redis 등의 스토리지에 저장된 refreshToken이 삭제됩니다.)
                     
-                    - **WEB 클라이언트**: refreshToken 쿠키를 자동으로 삭제합니다.
-                    - **MOBILE 클라이언트**: 요청 바디의 `refreshToken` 필드로 전송합니다.
+                    ### 📥 **입력 (Input)**
+                    - `Authorization` 헤더: `Bearer <accessToken>` 필수.
+                    - **WEB 클라이언트**: `refreshToken` 쿠키가 자동으로 전송되므로 본문 불필요.
+                    - **MOBILE 클라이언트**: 요청 바디에 `refreshToken`을 담아 전송해야 삭제 처리 가능.
+                    
+                    ### 📤 **출력 (Output)**
+                    - 성공 시 `success: true` 응답 반환.
+                    - **WEB 클라이언트**: 추가적으로 `refreshToken` 쿠키를 만료(삭제)시키는 Set-Cookie 헤더가 포함됩니다.
                     """,
             security = @SecurityRequirement(name = "bearerAuth")
     )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
-                    description = "로그아웃 성공",
+                    description = "로그아웃 처리가 완료되었습니다.",
                     content = @Content(
                             schema = @Schema(type = "object"),
-                            examples = @ExampleObject(value = "{\"success\": true}")
+                            examples = @ExampleObject(
+                                    name = "logoutSuccessExample",
+                                    summary = "로그아웃 성공 반환 값",
+                                    value = "{\"success\": true}"
+                            )
                     )
             ),
-            @ApiResponse(responseCode = "401", description = "인증되지 않은 요청")
+            @ApiResponse(responseCode = "401", description = "인증 헤더가 유효하지 않은 요청")
     })
     Map<String, Object> logout(
             @RequestBody(
                     required = false,
-                    content = @Content(schema = @Schema(implementation = LogoutRequest.class))
+                    description = "MOBILE 클라이언트인 경우 로그아웃할 refreshToken 필수",
+                    content = @Content(
+                            schema = @Schema(implementation = LogoutRequest.class),
+                            examples = @ExampleObject(
+                                    name = "logoutRequestExample",
+                                    summary = "MOBILE용 로그아웃 요청",
+                                    value = "{\n  \"refreshToken\": \"eyJhbGciOiJIUzI1NiJ9...\"\n}"
+                            )
+                    )
             )
             LogoutRequest requestBody,
 
             @Parameter(
                     name = "X-Client-Type",
-                    description = "클라이언트 타입 (WEB | MOBILE)",
+                    description = "쿠키 삭제 여부를 결정하는 클라이언트 타입 (WEB | MOBILE)",
                     in = ParameterIn.HEADER,
                     schema = @Schema(type = "string", allowableValues = {"WEB", "MOBILE"}),
                     example = "MOBILE"

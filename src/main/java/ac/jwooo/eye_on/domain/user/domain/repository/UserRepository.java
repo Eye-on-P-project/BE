@@ -1,5 +1,7 @@
 package ac.jwooo.eye_on.domain.user.domain.repository;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 import ac.jwooo.eye_on.domain.user.domain.entity.User;
@@ -12,5 +14,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmailAndDeletedAtIsNull(String email);
 
     Optional<User> findByIdAndDeletedAtIsNull(Long id);
-}
 
+    List<User> findAllByIdInAndDeletedAtIsNull(Collection<Long> ids);
+}

@@ -12,5 +12,7 @@ public interface OrganizationCodeRepository extends JpaRepository<OrganizationCo
 
     Optional<OrganizationCode> findByIdAndDeletedAtIsNull(Long id);
 
+    Optional<OrganizationCode> findByCodeAndDeletedAtIsNull(String code);
+
     List<OrganizationCode> findAllByDeletedAtIsNullOrderByCreatedAtDesc();
 }

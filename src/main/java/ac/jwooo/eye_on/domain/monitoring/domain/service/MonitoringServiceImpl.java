@@ -56,6 +56,7 @@ public class MonitoringServiceImpl implements MonitoringService {
     public MonitoringSessionEndResponse endSession(Long userId, Long sessionId, EndMonitoringSessionRequest request) {
         MonitoringSession monitoringSession = getOwnedSession(userId, sessionId);
         LocalDateTime endedAtApp = truncateToSeconds(request.endedAtApp());
+        LocalDateTime endedAtServer = nowWithoutNanos();
 
         if (monitoringSession.isEnded()) {
             throw new CustomException(ErrorCode.MONITORING_SESSION_ALREADY_ENDED);
@@ -64,10 +65,10 @@ public class MonitoringServiceImpl implements MonitoringService {
             throw new CustomException(ErrorCode.INVALID_MONITORING_TIME_RANGE);
         }
 
-        long durationMinutesLong = Duration.between(monitoringSession.getStartedAtApp(), endedAtApp).toMinutes();
+        long durationMinutesLong = Duration.between(monitoringSession.getStartedAtServer(), endedAtServer).toMinutes();
         int durationMinutes = (int) Math.min(durationMinutesLong, Integer.MAX_VALUE);
 
-        monitoringSession.end(endedAtApp, nowWithoutNanos(), durationMinutes);
+        monitoringSession.end(endedAtApp, endedAtServer, durationMinutes);
         return MonitoringSessionEndResponse.from(monitoringSession);
     }
 
@@ -87,7 +88,12 @@ public class MonitoringServiceImpl implements MonitoringService {
         }
 
         if (eventType == MonitoringEventType.NORMAL) {
-            return resolveMonitoringEvent(monitoringSession, occurredAtApp, request.eventId());
+            return resolveMonitoringEvent(
+                    monitoringSession,
+                    occurredAtApp,
+                    nowWithoutNanos(),
+                    request.eventId()
+            );
         }
 
         if (request.eventId() != null) {
@@ -132,6 +138,7 @@ public class MonitoringServiceImpl implements MonitoringService {
     private MonitoringEventResponse resolveMonitoringEvent(
             MonitoringSession monitoringSession,
             LocalDateTime normalOccurredAtApp,
+            LocalDateTime resolvedAtServer,
             Long eventId
     ) {
         if (eventId == null) {
@@ -161,11 +168,11 @@ public class MonitoringServiceImpl implements MonitoringService {
         }
 
         BigDecimal durationSeconds = calculateDurationSeconds(
-                monitoringEventLog.getOccurredAtApp(),
-                normalOccurredAtApp
+                monitoringEventLog.getOccurredAtServer(),
+                resolvedAtServer
         );
 
-        monitoringEventLog.resolve(normalOccurredAtApp, nowWithoutNanos(), durationSeconds);
+        monitoringEventLog.resolve(normalOccurredAtApp, resolvedAtServer, durationSeconds);
         return MonitoringEventResponse.from(monitoringEventLog, monitoringSession);
     }
 

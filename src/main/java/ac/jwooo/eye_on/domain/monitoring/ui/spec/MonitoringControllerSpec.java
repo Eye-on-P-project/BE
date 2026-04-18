@@ -113,7 +113,7 @@ public interface MonitoringControllerSpec {
                     
                     ### 📤 출력 (Output)
                     - `endedAtServer`: 서버 수신 시각
-                    - `durationMinutes`: `startedAtApp ~ endedAtApp` 차이를 **분 단위**로 저장
+                    - `durationMinutes`: `startedAtServer ~ endedAtServer` 차이를 **분 단위**로 저장
                     - `drowsyCount`, `sleepCount`: 누적 이벤트 카운트
                     """,
             security = @SecurityRequirement(name = "bearerAuth")
@@ -195,7 +195,7 @@ public interface MonitoringControllerSpec {
                       `resolvedAtApp`, `resolvedAtServer`, `durationSeconds`를 업데이트
                     
                     ### duration 계산
-                    - `durationSeconds = NORMAL.occurredAtApp - (기존 이벤트 발생시각)`
+                    - `durationSeconds = resolvedAtServer - occurredAtServer`
                     - 단위: 초(second)
                     - 소수점 둘째 자리까지 저장 (예: `6.20`)
                     """,

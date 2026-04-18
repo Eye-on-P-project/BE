@@ -1,8 +1,10 @@
-package ac.example.eye.on;
+package ac.jwooo.eye_on;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 
+@ConfigurationPropertiesScan
 @SpringBootApplication
 public class EyeOnApplication {
 

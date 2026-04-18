@@ -49,7 +49,7 @@ public interface AuthControllerSpec {
                     
                     **[ 클라이언트 타입에 따른 처리 ]**
                     - **WEB 클라이언트 (`X-Client-Type: WEB`)**: refreshToken이 응답 바디가 아닌 `HttpOnly` 쿠키로 설정됩니다.
-                    - **MOBILE 클라이언트 (`X-Client-Type: MOBILE` 또는 미입력)**: refreshToken이 응답 바디에 포함됩니다.
+                    - **APP 클라이언트 (`X-Client-Type: APP` 또는 미입력)**: refreshToken이 응답 바디에 포함됩니다.
                     """
     )
     @ApiResponses({
@@ -102,9 +102,9 @@ public interface AuthControllerSpec {
 
             @Parameter(
                     name = "X-Client-Type",
-                    description = "클라이언트 환경을 구분하는 헤더 (WEB | MOBILE). 기본값: MOBILE",
+                    description = "클라이언트 환경을 구분하는 헤더 (WEB | APP). 기본값: APP",
                     in = ParameterIn.HEADER,
-                    schema = @Schema(type = "string", allowableValues = {"WEB", "MOBILE"}),
+                    schema = @Schema(type = "string", allowableValues = {"WEB", "APP"}),
                     example = "WEB"
             )
             @RequestHeader(value = "X-Client-Type", required = false) String clientTypeHeader,
@@ -130,7 +130,7 @@ public interface AuthControllerSpec {
                     
                     **[ 클라이언트 타입에 따른 처리 ]**
                     - **WEB 클라이언트**: refreshToken이 `HttpOnly` 쿠키에 담겨 반환됩니다. (보안 강화)
-                    - **MOBILE 클라이언트**: refreshToken이 응답 바디의 JSON에 포함됩니다.
+                    - **APP 클라이언트**: refreshToken이 응답 바디의 JSON에 포함됩니다.
                     """
     )
     @ApiResponses({
@@ -178,9 +178,9 @@ public interface AuthControllerSpec {
 
             @Parameter(
                     name = "X-Client-Type",
-                    description = "동작 환경 설정을 위한 클라이언트 타입 (WEB | MOBILE)",
+                    description = "동작 환경 설정을 위한 클라이언트 타입 (WEB | APP)",
                     in = ParameterIn.HEADER,
-                    schema = @Schema(type = "string", allowableValues = {"WEB", "MOBILE"}),
+                    schema = @Schema(type = "string", allowableValues = {"WEB", "APP"}),
                     example = "WEB"
             )
             @RequestHeader(value = "X-Client-Type", required = false) String clientTypeHeader,
@@ -197,7 +197,7 @@ public interface AuthControllerSpec {
                     
                     ### 📥 **입력 (Input)**
                     - **WEB 클라이언트**: 별도의 Request Body 없이, 자동으로 전송되는 `refreshToken` 쿠키를 이용합니다.
-                    - **MOBILE 클라이언트**: 바디의 `refreshToken` 필드에 토큰 값을 명시적으로 포함하여 전송해야 합니다.
+                    - **APP 클라이언트**: 바디의 `refreshToken` 필드에 토큰 값을 명시적으로 포함하여 전송해야 합니다.
                     
                     ### 📤 **출력 (Output)**
                     - 로그인과 동일하게 `accessToken` 및 `refreshToken`이 갱신되어 반환됩니다.
@@ -228,7 +228,7 @@ public interface AuthControllerSpec {
     AuthTokenResponse refresh(
             @RequestBody(
                     required = false,
-                    description = "토큰 갱신 요청 모델 (MOBILE 환경에서는 필수)",
+                    description = "토큰 갱신 요청 모델 (APP 환경에서는 필수)",
                     content = @Content(
                             schema = @Schema(implementation = RefreshRequest.class),
                             examples = @ExampleObject(
@@ -246,10 +246,10 @@ public interface AuthControllerSpec {
 
             @Parameter(
                     name = "X-Client-Type",
-                    description = "토큰 획득/반환 방식을 구분하는 클라이언트 타입 (WEB | MOBILE)",
+                    description = "토큰 획득/반환 방식을 구분하는 클라이언트 타입 (WEB | APP)",
                     in = ParameterIn.HEADER,
-                    schema = @Schema(type = "string", allowableValues = {"WEB", "MOBILE"}),
-                    example = "MOBILE"
+                    schema = @Schema(type = "string", allowableValues = {"WEB", "APP"}),
+                    example = "APP"
             )
             @RequestHeader(value = "X-Client-Type", required = false) String clientTypeHeader,
 
@@ -267,7 +267,7 @@ public interface AuthControllerSpec {
                     ### 📥 **입력 (Input)**
                     - `Authorization` 헤더: `Bearer <accessToken>` 필수.
                     - **WEB 클라이언트**: `refreshToken` 쿠키가 자동으로 전송되므로 본문 불필요.
-                    - **MOBILE 클라이언트**: 요청 바디에 `refreshToken`을 담아 전송해야 삭제 처리 가능.
+                    - **APP 클라이언트**: 요청 바디에 `refreshToken`을 담아 전송해야 삭제 처리 가능.
                     
                     ### 📤 **출력 (Output)**
                     - 성공 시 `success: true` 응답 반환.
@@ -293,7 +293,7 @@ public interface AuthControllerSpec {
     Map<String, Object> logout(
             @RequestBody(
                     required = false,
-                    description = "MOBILE 클라이언트인 경우 로그아웃할 refreshToken 필수",
+                    description = "APP 클라이언트인 경우 로그아웃할 refreshToken 필수",
                     content = @Content(
                             schema = @Schema(implementation = LogoutRequest.class),
                             examples = @ExampleObject(
@@ -307,10 +307,10 @@ public interface AuthControllerSpec {
 
             @Parameter(
                     name = "X-Client-Type",
-                    description = "쿠키 삭제 여부를 결정하는 클라이언트 타입 (WEB | MOBILE)",
+                    description = "쿠키 삭제 여부를 결정하는 클라이언트 타입 (WEB | APP)",
                     in = ParameterIn.HEADER,
-                    schema = @Schema(type = "string", allowableValues = {"WEB", "MOBILE"}),
-                    example = "MOBILE"
+                    schema = @Schema(type = "string", allowableValues = {"WEB", "APP"}),
+                    example = "APP"
             )
             @RequestHeader(value = "X-Client-Type", required = false) String clientTypeHeader,
 

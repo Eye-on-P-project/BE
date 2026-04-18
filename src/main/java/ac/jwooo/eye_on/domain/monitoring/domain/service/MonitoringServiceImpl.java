@@ -1,7 +1,5 @@
 package ac.jwooo.eye_on.domain.monitoring.domain.service;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -10,13 +8,16 @@ import ac.jwooo.eye_on.domain.monitoring.application.dto.request.CreateMonitorin
 import ac.jwooo.eye_on.domain.monitoring.application.dto.request.EndMonitoringSessionRequest;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.request.StartMonitoringSessionRequest;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringEventResponse;
+import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringRealtimeSummaryResponse;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringSessionEndResponse;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringSessionStartResponse;
 import ac.jwooo.eye_on.domain.monitoring.domain.entity.MonitoringEventLog;
 import ac.jwooo.eye_on.domain.monitoring.domain.entity.MonitoringEventType;
 import ac.jwooo.eye_on.domain.monitoring.domain.entity.MonitoringSession;
 import ac.jwooo.eye_on.domain.monitoring.domain.repository.MonitoringEventLogRepository;
+import ac.jwooo.eye_on.domain.monitoring.domain.repository.MonitoringSessionRealtimeSummaryProjection;
 import ac.jwooo.eye_on.domain.monitoring.domain.repository.MonitoringSessionRepository;
+import ac.jwooo.eye_on.domain.organization.domain.service.OrganizationAccessService;
 import ac.jwooo.eye_on.global.exception.CustomException;
 import ac.jwooo.eye_on.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ public class MonitoringServiceImpl implements MonitoringService {
 
     private final MonitoringSessionRepository monitoringSessionRepository;
     private final MonitoringEventLogRepository monitoringEventLogRepository;
+    private final OrganizationAccessService organizationAccessService;
 
     @Override
     @Transactional
@@ -86,18 +88,19 @@ public class MonitoringServiceImpl implements MonitoringService {
             throw new CustomException(ErrorCode.INVALID_MONITORING_TIME_RANGE);
         }
 
-        if (eventType == MonitoringEventType.NORMAL) {
-            return resolveMonitoringEvent(monitoringSession, occurredAtApp, request.eventId());
-        }
+        monitoringEventLogRepository.findTopBySessionIdAndDeletedAtIsNullOrderByOccurredAtAppDescIdDesc(sessionId)
+                .ifPresent(lastEvent -> {
+                    if (occurredAtApp.isBefore(lastEvent.getOccurredAtApp())) {
+                        throw new CustomException(
+                                ErrorCode.INVALID_MONITORING_TIME_RANGE,
+                                "이벤트 시각은 같은 세션의 이전 이벤트보다 빠를 수 없습니다."
+                        );
+                    }
+                });
 
-        if (request.eventId() != null) {
-            throw new CustomException(
-                    ErrorCode.INVALID_MONITORING_EVENT_REQUEST,
-                    "DROWSY/SLEEP 이벤트에는 eventId를 보내지 않아야 합니다."
-            );
+        if (eventType != MonitoringEventType.NORMAL) {
+            monitoringSession.increaseEventCount(eventType);
         }
-
-        monitoringSession.increaseEventCount(eventType);
 
         MonitoringEventLog monitoringEventLog = MonitoringEventLog.create(
                 monitoringSession.getId(),
@@ -108,6 +111,15 @@ public class MonitoringServiceImpl implements MonitoringService {
 
         MonitoringEventLog savedMonitoringEventLog = monitoringEventLogRepository.save(monitoringEventLog);
         return MonitoringEventResponse.from(savedMonitoringEventLog, monitoringSession);
+    }
+
+    @Override
+    public MonitoringRealtimeSummaryResponse getRealtimeSummary(Long userId) {
+        Long organizationId = organizationAccessService.resolveOwnedOrganization(userId).getId();
+        MonitoringSessionRealtimeSummaryProjection projection = monitoringSessionRepository
+                .findRealtimeSummaryByOrganizationId(organizationId);
+
+        return MonitoringRealtimeSummaryResponse.from(projection);
     }
 
     private MonitoringSession getOwnedSession(Long userId, Long sessionId) {
@@ -127,51 +139,5 @@ public class MonitoringServiceImpl implements MonitoringService {
 
     private LocalDateTime truncateToSeconds(LocalDateTime value) {
         return value.withNano(0);
-    }
-
-    private MonitoringEventResponse resolveMonitoringEvent(
-            MonitoringSession monitoringSession,
-            LocalDateTime normalOccurredAtApp,
-            Long eventId
-    ) {
-        if (eventId == null) {
-            throw new CustomException(
-                    ErrorCode.INVALID_MONITORING_EVENT_REQUEST,
-                    "NORMAL 이벤트에는 종료할 eventId가 필요합니다."
-            );
-        }
-
-        MonitoringEventLog monitoringEventLog = monitoringEventLogRepository
-                .findByIdAndSessionIdAndDeletedAtIsNull(eventId, monitoringSession.getId())
-                .orElseThrow(() -> new CustomException(ErrorCode.MONITORING_EVENT_NOT_FOUND));
-
-        if (monitoringEventLog.getEventType() == MonitoringEventType.NORMAL) {
-            throw new CustomException(
-                    ErrorCode.INVALID_MONITORING_EVENT_REQUEST,
-                    "NORMAL 타입 이벤트 로그는 종료 대상으로 사용할 수 없습니다."
-            );
-        }
-
-        if (monitoringEventLog.isResolved()) {
-            throw new CustomException(ErrorCode.MONITORING_EVENT_ALREADY_RESOLVED);
-        }
-
-        if (normalOccurredAtApp.isBefore(monitoringEventLog.getOccurredAtApp())) {
-            throw new CustomException(ErrorCode.INVALID_MONITORING_TIME_RANGE);
-        }
-
-        BigDecimal durationSeconds = calculateDurationSeconds(
-                monitoringEventLog.getOccurredAtApp(),
-                normalOccurredAtApp
-        );
-
-        monitoringEventLog.resolve(normalOccurredAtApp, nowWithoutNanos(), durationSeconds);
-        return MonitoringEventResponse.from(monitoringEventLog, monitoringSession);
-    }
-
-    private BigDecimal calculateDurationSeconds(LocalDateTime start, LocalDateTime end) {
-        long durationMillis = Duration.between(start, end).toMillis();
-        return BigDecimal.valueOf(durationMillis)
-                .divide(BigDecimal.valueOf(1000), 2, RoundingMode.HALF_UP);
     }
 }

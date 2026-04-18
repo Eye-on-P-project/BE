@@ -1,6 +1,5 @@
 package ac.jwooo.eye_on.domain.monitoring.domain.entity;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import ac.jwooo.eye_on.global.common.entity.BaseEntity;
@@ -10,6 +9,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -18,7 +18,12 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(name = "monitoring_event_logs")
+@Table(
+        name = "monitoring_event_logs",
+        indexes = {
+                @Index(name = "idx_mel_session_latest", columnList = "session_id,deleted_at,occurred_at_app,id,event_type")
+        }
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class MonitoringEventLog extends BaseEntity {
 
@@ -39,32 +44,17 @@ public class MonitoringEventLog extends BaseEntity {
     @Column(name = "occurred_at_server", nullable = false)
     private LocalDateTime occurredAtServer;
 
-    @Column(name = "resolved_at_app")
-    private LocalDateTime resolvedAtApp;
-
-    @Column(name = "resolved_at_server")
-    private LocalDateTime resolvedAtServer;
-
-    @Column(name = "duration_seconds", precision = 10, scale = 2)
-    private BigDecimal durationSeconds;
-
     @Builder(access = AccessLevel.PRIVATE)
     private MonitoringEventLog(
             Long sessionId,
             MonitoringEventType eventType,
             LocalDateTime occurredAtApp,
-            LocalDateTime occurredAtServer,
-            LocalDateTime resolvedAtApp,
-            LocalDateTime resolvedAtServer,
-            BigDecimal durationSeconds
+            LocalDateTime occurredAtServer
     ) {
         this.sessionId = sessionId;
         this.eventType = eventType;
         this.occurredAtApp = occurredAtApp;
         this.occurredAtServer = occurredAtServer;
-        this.resolvedAtApp = resolvedAtApp;
-        this.resolvedAtServer = resolvedAtServer;
-        this.durationSeconds = durationSeconds;
     }
 
     public static MonitoringEventLog create(
@@ -79,19 +69,5 @@ public class MonitoringEventLog extends BaseEntity {
                 .occurredAtApp(occurredAtApp)
                 .occurredAtServer(occurredAtServer)
                 .build();
-    }
-
-    public boolean isResolved() {
-        return resolvedAtServer != null;
-    }
-
-    public void resolve(
-            LocalDateTime resolvedAtApp,
-            LocalDateTime resolvedAtServer,
-            BigDecimal durationSeconds
-    ) {
-        this.resolvedAtApp = resolvedAtApp;
-        this.resolvedAtServer = resolvedAtServer;
-        this.durationSeconds = durationSeconds;
     }
 }

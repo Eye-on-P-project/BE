@@ -9,6 +9,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -17,7 +18,13 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(name = "monitoring_sessions")
+@Table(
+        name = "monitoring_sessions",
+        indexes = {
+                @Index(name = "idx_ms_user_active", columnList = "user_id,ended_at_server,deleted_at"),
+                @Index(name = "idx_ms_user_started", columnList = "user_id,started_at_server,deleted_at")
+        }
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class MonitoringSession extends BaseEntity {
 
@@ -111,4 +118,3 @@ public class MonitoringSession extends BaseEntity {
         sleepCount += 1;
     }
 }
-

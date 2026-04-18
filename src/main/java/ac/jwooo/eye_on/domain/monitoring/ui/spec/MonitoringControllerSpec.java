@@ -4,6 +4,7 @@ import ac.jwooo.eye_on.domain.monitoring.application.dto.request.CreateMonitorin
 import ac.jwooo.eye_on.domain.monitoring.application.dto.request.EndMonitoringSessionRequest;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.request.StartMonitoringSessionRequest;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringEventResponse;
+import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringRealtimeSummaryResponse;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringSessionEndResponse;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringSessionStartResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -22,6 +23,51 @@ import org.springframework.security.core.Authentication;
 
 @Tag(name = "Monitoring", description = "모니터링 세션/이벤트 API")
 public interface MonitoringControllerSpec {
+
+    @Operation(
+            summary = "대시보드 실시간 요약 조회",
+            description = """
+                    **[ 대시보드 실시간 요약 API ]**
+                    관리자 기준 소속 조직의 실시간 위젯 요약 값을 조회합니다.
+                    
+                    ### 📥 입력 (Input)
+                    - `Authorization: Bearer {accessToken}` 헤더 (필수, 관리자 계정)
+                    
+                    ### 📤 출력 (Output)
+                    - `totalMemberCount`: 조직 내 활성 구성원 수
+                    - `activeSessionCount`: 현재 종료되지 않은 모니터링 세션 수
+                    - `warningSessionCount`: 활성 세션 중 최신 상태가 졸음/수면인 세션 수
+                    - `drowsyWarningSessionCount`: 활성 세션 중 최신 상태가 졸음인 세션 수
+                    - `sleepWarningSessionCount`: 활성 세션 중 최신 상태가 수면인 세션 수
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "실시간 요약 조회 성공",
+                    content = @Content(
+                            schema = @Schema(implementation = MonitoringRealtimeSummaryResponse.class),
+                            examples = @ExampleObject(
+                                    name = "monitoringRealtimeSummaryResponseExample",
+                                    summary = "실시간 요약 응답 예시",
+                                    value = """
+                                            {
+                                              "totalMemberCount": 25,
+                                              "activeSessionCount": 13,
+                                              "warningSessionCount": 4,
+                                              "drowsyWarningSessionCount": 3,
+                                              "sleepWarningSessionCount": 2
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @ApiResponse(responseCode = "401", description = "인증 실패"),
+            @ApiResponse(responseCode = "403", description = "관리자 권한 없음"),
+            @ApiResponse(responseCode = "404", description = "조직 정보를 찾을 수 없음")
+    })
+    MonitoringRealtimeSummaryResponse getRealtimeSummary(Authentication authentication);
 
     @Operation(
             summary = "모니터링 시작",
@@ -181,23 +227,17 @@ public interface MonitoringControllerSpec {
             summary = "졸음/수면 이벤트 기록",
             description = """
                     **[ 상태 변화 이벤트 API ]**
-                    모니터링 세션 중 발생한 상태 변화를 기록합니다.
+                    모니터링 세션 중 발생한 상태 변화(`DROWSY`, `SLEEP`, `NORMAL`)를 시간순 로그로 기록합니다.
                     
-                    ### 케이스 A) 이벤트 시작
-                    - `eventType = DROWSY | SLEEP`
-                    - 요청: `occurredAtApp`만 전달 (`eventId`는 보내지 않음)
-                    - 응답: 생성된 이벤트 로그 PK(`eventId`) 반환
+                    ### 동작 규칙
+                    - 이벤트는 append-only 방식으로 저장됩니다.
+                    - `eventId`를 이용한 기존 로그 수정/종료 처리는 하지 않습니다.
+                    - 같은 세션에서 새 이벤트 시각(`occurredAtApp`)은 이전 이벤트보다 빠를 수 없습니다.
                     
-                    ### 케이스 B) 이벤트 종료(정상 복귀)
-                    - `eventType = NORMAL`
-                    - 요청: `occurredAtApp + eventId` 전달
-                    - 서버는 해당 `eventId`를 종료 처리하고
-                      `resolvedAtApp`, `resolvedAtServer`, `durationSeconds`를 업데이트
-                    
-                    ### duration 계산
-                    - `durationSeconds = NORMAL.occurredAtApp - (기존 이벤트 발생시각)`
-                    - 단위: 초(second)
-                    - 소수점 둘째 자리까지 저장 (예: `6.20`)
+                    ### duration 해석 방식
+                    - duration은 저장값이 아니라, 같은 `sessionId`의 연속 로그 시각 차이로 해석합니다.
+                    - 예: `12:00 DROWSY` -> `12:01 SLEEP`이면 DROWSY 지속시간은 1분입니다.
+                    - 예: `12:01 SLEEP` -> `12:02 NORMAL`이면 SLEEP 지속시간은 1분입니다.
                     """,
             security = @SecurityRequirement(name = "bearerAuth")
     )
@@ -218,27 +258,21 @@ public interface MonitoringControllerSpec {
                                                       "eventType": "DROWSY",
                                                       "occurredAtApp": "2026-04-18T21:15:10",
                                                       "occurredAtServer": "2026-04-18T21:15:10",
-                                                      "resolvedAtApp": null,
-                                                      "resolvedAtServer": null,
-                                                      "durationSeconds": null,
                                                       "drowsyCount": 4,
                                                       "sleepCount": 1
                                                     }
                                                     """
                                     ),
                                     @ExampleObject(
-                                            name = "resolveEventResponseExample",
-                                            summary = "NORMAL 종료 응답 예시",
+                                            name = "normalEventResponseExample",
+                                            summary = "NORMAL 상태 변화 응답 예시",
                                             value = """
                                                     {
-                                                      "eventId": 223456789012345678,
+                                                      "eventId": 223456789012345679,
                                                       "sessionId": 123456789012345678,
-                                                      "eventType": "DROWSY",
-                                                      "occurredAtApp": "2026-04-18T21:15:10",
-                                                      "occurredAtServer": "2026-04-18T21:15:10",
-                                                      "resolvedAtApp": "2026-04-18T21:15:16",
-                                                      "resolvedAtServer": "2026-04-18T21:15:16",
-                                                      "durationSeconds": 6.00,
+                                                      "eventType": "NORMAL",
+                                                      "occurredAtApp": "2026-04-18T21:15:16",
+                                                      "occurredAtServer": "2026-04-18T21:15:16",
                                                       "drowsyCount": 4,
                                                       "sleepCount": 1
                                                     }
@@ -248,9 +282,8 @@ public interface MonitoringControllerSpec {
                     )
             ),
             @ApiResponse(responseCode = "400", description = "요청 형식 오류 또는 유효하지 않은 시간 범위"),
-            @ApiResponse(responseCode = "409", description = "이미 종료된 이벤트를 다시 종료 요청함"),
             @ApiResponse(responseCode = "401", description = "인증 실패"),
-            @ApiResponse(responseCode = "404", description = "세션 또는 이벤트 없음")
+            @ApiResponse(responseCode = "404", description = "세션 없음")
     })
     MonitoringEventResponse createMonitoringEvent(
             Authentication authentication,
@@ -273,19 +306,17 @@ public interface MonitoringControllerSpec {
                                             value = """
                                                     {
                                                       "eventType": "DROWSY",
-                                                      "occurredAtApp": "2026-04-18T21:15:10",
-                                                      "eventId": null
+                                                      "occurredAtApp": "2026-04-18T21:15:10"
                                                     }
                                                     """
                                     ),
                                     @ExampleObject(
-                                            name = "resolveEventExample",
-                                            summary = "정상 복귀로 이벤트 종료",
+                                            name = "normalEventExample",
+                                            summary = "정상 상태 이벤트 기록",
                                             value = """
                                                     {
                                                       "eventType": "NORMAL",
-                                                      "occurredAtApp": "2026-04-18T21:15:16",
-                                                      "eventId": 223456789012345678
+                                                      "occurredAtApp": "2026-04-18T21:15:16"
                                                     }
                                                     """
                                     )

@@ -3,8 +3,10 @@ package ac.jwooo.eye_on.domain.user.application.dto.response;
 import ac.jwooo.eye_on.domain.user.domain.entity.Gender;
 import ac.jwooo.eye_on.domain.user.domain.entity.UserRole;
 import ac.jwooo.eye_on.domain.user.domain.entity.User;
+import com.fasterxml.jackson.annotation.JsonFormat;
 
 public record MeResponse(
+        @JsonFormat(shape = JsonFormat.Shape.STRING)
         Long userId,
         String email,
         UserRole role,

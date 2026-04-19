@@ -6,6 +6,7 @@ import java.util.Map;
 import ac.jwooo.eye_on.domain.user.application.dto.request.CreateOrganizationRecordRequest;
 import ac.jwooo.eye_on.domain.user.application.dto.response.MeResponse;
 import ac.jwooo.eye_on.domain.user.application.dto.response.OrganizationRecordResponse;
+import ac.jwooo.eye_on.domain.user.domain.entity.UserRole;
 import ac.jwooo.eye_on.domain.user.domain.service.OrganizationRecordService;
 import ac.jwooo.eye_on.domain.user.domain.service.UserQueryService;
 import ac.jwooo.eye_on.domain.user.ui.spec.UserControllerSpec;
@@ -40,18 +41,37 @@ public class UserController implements UserControllerSpec {
     }
 
     @PostMapping("/dev/organizations")
-    public OrganizationRecordResponse createOrganizationRecord(@Valid @RequestBody CreateOrganizationRecordRequest request) {
+    public OrganizationRecordResponse createOrganizationRecord(
+            Authentication authentication,
+            @Valid @RequestBody CreateOrganizationRecordRequest request
+    ) {
+        extractAdminUserId(authentication);
         return organizationRecordService.createOrganizationRecord(request);
     }
 
     @GetMapping("/dev/organizations")
-    public List<OrganizationRecordResponse> getOrganizationRecords() {
+    public List<OrganizationRecordResponse> getOrganizationRecords(Authentication authentication) {
+        extractAdminUserId(authentication);
         return organizationRecordService.getAllOrganizationRecords();
     }
 
     @DeleteMapping("/dev/organizations/{organizationRecordId}")
-    public Map<String, Object> deleteOrganizationRecord(@PathVariable Long organizationRecordId) {
+    public Map<String, Object> deleteOrganizationRecord(
+            Authentication authentication,
+            @PathVariable Long organizationRecordId
+    ) {
+        extractAdminUserId(authentication);
         organizationRecordService.deleteOrganizationRecord(organizationRecordId);
         return Map.of("success", true);
+    }
+
+    private Long extractAdminUserId(Authentication authentication) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof AuthenticatedUser principal)) {
+            throw new CustomException(ErrorCode.UNAUTHORIZED);
+        }
+        if (principal.role() != UserRole.ADMIN) {
+            throw new CustomException(ErrorCode.ORGANIZATION_ADMIN_REQUIRED);
+        }
+        return principal.userId();
     }
 }

@@ -88,7 +88,7 @@ public interface MonitoringControllerSpec {
                     ### 📤 이벤트 (Output)
                     - `connected`: 연결 직후
                     - `summary`: 최신 요약 값 (`MonitoringRealtimeSummaryResponse`)
-                    - `alert`: `DROWSY`/`SLEEP` 알림 (`MonitoringNotificationResponse`)
+                    - `alert`: `NORMAL`/`DROWSY`/`SLEEP` 알림 (`MonitoringNotificationResponse`)
                     - `heartbeat`: 연결 유지용 하트비트
                     """,
             security = @SecurityRequirement(name = "bearerAuth")

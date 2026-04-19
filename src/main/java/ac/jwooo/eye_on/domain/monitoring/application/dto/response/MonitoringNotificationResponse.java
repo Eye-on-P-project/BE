@@ -46,4 +46,23 @@ public record MonitoringNotificationResponse(
                 occurredAt
         );
     }
+
+    public static MonitoringNotificationResponse ofStream(
+            Long userId,
+            Long targetUserId,
+            String userName,
+            NotificationType type,
+            String content,
+            LocalDateTime occurredAt
+    ) {
+        return new MonitoringNotificationResponse(
+                null,
+                userId,
+                targetUserId,
+                userName,
+                type,
+                content,
+                occurredAt
+        );
+    }
 }

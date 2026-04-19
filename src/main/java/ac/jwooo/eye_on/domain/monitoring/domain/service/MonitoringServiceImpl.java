@@ -141,7 +141,7 @@ public class MonitoringServiceImpl implements MonitoringService {
 
         MonitoringEventLog savedMonitoringEventLog = monitoringEventLogRepository.save(monitoringEventLog);
         MonitoringEventResponse eventResponse = MonitoringEventResponse.from(savedMonitoringEventLog, monitoringSession);
-        MonitoringNotificationResponse notificationResponse = createNotificationIfRequired(monitoringSession, eventResponse);
+        MonitoringNotificationResponse notificationResponse = createAlertResponse(monitoringSession, eventResponse);
         publishRealtimeSummaryUpdate(monitoringSession, eventResponse, notificationResponse);
         return eventResponse;
     }
@@ -279,21 +279,32 @@ public class MonitoringServiceImpl implements MonitoringService {
         });
     }
 
-    private MonitoringNotificationResponse createNotificationIfRequired(
+    private MonitoringNotificationResponse createAlertResponse(
             MonitoringSession monitoringSession,
             MonitoringEventResponse eventResponse
     ) {
         if (monitoringSession.getMode() != MonitoringMode.ORGANIZATION) {
             return null;
         }
+
+        User sourceUser = userRepository.findByIdAndDeletedAtIsNull(monitoringSession.getUserId()).orElse(null);
+        String sourceUserName = resolveDisplayName(sourceUser, monitoringSession.getUserId());
+        NotificationType notificationType = NotificationType.fromMonitoringEventType(eventResponse.eventType());
+
+        if (notificationType == NotificationType.NORMAL) {
+            return MonitoringNotificationResponse.ofStream(
+                    monitoringSession.getUserId(),
+                    monitoringSession.getUserId(),
+                    sourceUserName,
+                    notificationType,
+                    buildNotificationContent(sourceUserName, notificationType),
+                    eventResponse.occurredAtServer()
+            );
+        }
         if (!isRiskEvent(eventResponse.eventType())) {
             return null;
         }
 
-        User sourceUser = userRepository.findByIdAndDeletedAtIsNull(monitoringSession.getUserId()).orElse(null);
-        String sourceUserName = resolveDisplayName(sourceUser, monitoringSession.getUserId());
-
-        NotificationType notificationType = NotificationType.fromMonitoringEventType(eventResponse.eventType());
         String content = buildNotificationContent(sourceUserName, notificationType);
         Notification savedNotification = notificationRepository.save(Notification.create(
                 monitoringSession.getUserId(),
@@ -330,6 +341,9 @@ public class MonitoringServiceImpl implements MonitoringService {
     }
 
     private String buildNotificationContent(String sourceUserName, NotificationType notificationType) {
+        if (notificationType == NotificationType.NORMAL) {
+            return sourceUserName + " 사용자가 정상 상태로 복귀했습니다.";
+        }
         if (notificationType == NotificationType.SLEEP) {
             return sourceUserName + " 사용자에게 수면 상태 경고가 감지되었습니다.";
         }

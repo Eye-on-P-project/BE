@@ -1,10 +1,14 @@
 package ac.jwooo.eye_on.domain.monitoring.domain.entity;
 
 public enum NotificationType {
+    NORMAL,
     DROWSY,
     SLEEP;
 
     public static NotificationType fromMonitoringEventType(MonitoringEventType eventType) {
+        if (eventType == MonitoringEventType.NORMAL) {
+            return NORMAL;
+        }
         if (eventType == MonitoringEventType.DROWSY) {
             return DROWSY;
         }

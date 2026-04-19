@@ -99,6 +99,39 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
     @Query(
             value = """
                     SELECT
+                        ms.id AS sessionId,
+                        ms.user_id AS userId,
+                        u.name AS userName,
+                        ms.started_at_app AS startedAtApp,
+                        ms.ended_at_app AS endedAtApp,
+                        ms.duration_minutes AS durationMinutes,
+                        COALESCE(ms.drowsy_count, 0) AS drowsyCount,
+                        COALESCE(ms.sleep_count, 0) AS sleepCount,
+                        COALESCE(ms.drowsy_count + ms.sleep_count, 0) AS totalRiskCount
+                    FROM monitoring_sessions ms
+                    JOIN member m
+                      ON m.user_id = ms.user_id
+                     AND m.organization_id = :organizationId
+                     AND m.deleted_at IS NULL
+                    JOIN users u
+                      ON u.id = ms.user_id
+                     AND u.deleted_at IS NULL
+                    WHERE ms.deleted_at IS NULL
+                      AND ms.mode = 'ORGANIZATION'
+                      AND ms.ended_at_server IS NOT NULL
+                    ORDER BY ms.ended_at_server DESC, ms.id DESC
+                    LIMIT :limit
+                    """,
+            nativeQuery = true
+    )
+    List<MonitoringRecentEndedSessionProjection> findRecentEndedSessionsByOrganizationId(
+            @Param("organizationId") Long organizationId,
+            @Param("limit") int limit
+    );
+
+    @Query(
+            value = """
+                    SELECT
                         YEAR(ms.started_at_app) AS year,
                         MONTH(ms.started_at_app) AS month,
                         DAY(ms.started_at_app) AS day,

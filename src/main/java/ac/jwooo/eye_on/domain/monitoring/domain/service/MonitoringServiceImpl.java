@@ -8,12 +8,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import ac.jwooo.eye_on.domain.monitoring.application.dto.request.CreateMonitoringEventRequest;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.request.EndMonitoringSessionRequest;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.request.StartMonitoringSessionRequest;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringEventResponse;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringHourlyRisk24hResponse;
+import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringNotificationResponse;
+import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringNotificationPageResponse;
+import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringRecentEndedSessionResponse;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringRealtimeSummaryResponse;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringSessionEndResponse;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringSessionStartResponse;
@@ -21,12 +25,19 @@ import ac.jwooo.eye_on.domain.monitoring.domain.entity.MonitoringEventLog;
 import ac.jwooo.eye_on.domain.monitoring.domain.entity.MonitoringEventType;
 import ac.jwooo.eye_on.domain.monitoring.domain.entity.MonitoringMode;
 import ac.jwooo.eye_on.domain.monitoring.domain.entity.MonitoringSession;
+import ac.jwooo.eye_on.domain.monitoring.domain.entity.Notification;
+import ac.jwooo.eye_on.domain.monitoring.domain.entity.NotificationType;
 import ac.jwooo.eye_on.domain.monitoring.domain.repository.MonitoringEventLogRepository;
 import ac.jwooo.eye_on.domain.monitoring.domain.repository.MonitoringSessionRealtimeSummaryProjection;
 import ac.jwooo.eye_on.domain.monitoring.domain.repository.MonitoringSessionRepository;
+import ac.jwooo.eye_on.domain.monitoring.domain.repository.NotificationRepository;
 import ac.jwooo.eye_on.domain.monitoring.domain.repository.TimeBucketRiskCountProjection;
+import ac.jwooo.eye_on.domain.organization.domain.entity.OrganizationMember;
 import ac.jwooo.eye_on.domain.organization.domain.repository.OrganizationMemberRepository;
 import ac.jwooo.eye_on.domain.organization.domain.service.OrganizationAccessService;
+import ac.jwooo.eye_on.domain.user.domain.entity.User;
+import ac.jwooo.eye_on.domain.user.domain.entity.UserRole;
+import ac.jwooo.eye_on.domain.user.domain.repository.UserRepository;
 import ac.jwooo.eye_on.global.exception.CustomException;
 import ac.jwooo.eye_on.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +45,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Service
@@ -42,11 +54,14 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class MonitoringServiceImpl implements MonitoringService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+    private static final int MAX_RECENT_NOTIFICATIONS = 200;
 
     private final MonitoringSessionRepository monitoringSessionRepository;
     private final MonitoringEventLogRepository monitoringEventLogRepository;
+    private final NotificationRepository notificationRepository;
     private final OrganizationAccessService organizationAccessService;
     private final OrganizationMemberRepository organizationMemberRepository;
+    private final UserRepository userRepository;
     private final MonitoringRealtimeSseBroker monitoringRealtimeSseBroker;
 
     @Override
@@ -66,7 +81,7 @@ public class MonitoringServiceImpl implements MonitoringService {
         );
 
         MonitoringSession savedMonitoringSession = monitoringSessionRepository.save(monitoringSession);
-        publishRealtimeSummaryUpdate(savedMonitoringSession, null);
+        publishRealtimeSummaryUpdate(savedMonitoringSession, null, null);
         return MonitoringSessionStartResponse.from(savedMonitoringSession);
     }
 
@@ -87,7 +102,7 @@ public class MonitoringServiceImpl implements MonitoringService {
         int durationMinutes = (int) Math.min(durationMinutesLong, Integer.MAX_VALUE);
 
         monitoringSession.end(endedAtApp, nowWithoutNanos(), durationMinutes);
-        publishRealtimeSummaryUpdate(monitoringSession, null);
+        publishRealtimeSummaryUpdate(monitoringSession, null, null);
         return MonitoringSessionEndResponse.from(monitoringSession);
     }
 
@@ -129,7 +144,8 @@ public class MonitoringServiceImpl implements MonitoringService {
 
         MonitoringEventLog savedMonitoringEventLog = monitoringEventLogRepository.save(monitoringEventLog);
         MonitoringEventResponse eventResponse = MonitoringEventResponse.from(savedMonitoringEventLog, monitoringSession);
-        publishRealtimeSummaryUpdate(monitoringSession, eventResponse);
+        MonitoringNotificationResponse notificationResponse = createNotificationIfRequired(monitoringSession, eventResponse);
+        publishRealtimeSummaryUpdate(monitoringSession, eventResponse, notificationResponse);
         return eventResponse;
     }
 
@@ -188,6 +204,38 @@ public class MonitoringServiceImpl implements MonitoringService {
         );
     }
 
+    @Override
+    public List<MonitoringRecentEndedSessionResponse> getRecentEndedSessions(Long userId, int limit) {
+        Long organizationId = organizationAccessService.resolveOwnedOrganization(userId).getId();
+        int normalizedLimit = Math.max(1, Math.min(limit, 100));
+
+        return monitoringSessionRepository.findRecentEndedSessionsByOrganizationId(organizationId, normalizedLimit).stream()
+                .map(MonitoringRecentEndedSessionResponse::from)
+                .toList();
+    }
+
+    @Override
+    public MonitoringNotificationPageResponse getRecentNotifications(Long userId, Long cursor, int limit) {
+        organizationAccessService.resolveOwnedOrganization(userId);
+        int normalizedLimit = Math.max(1, Math.min(limit, MAX_RECENT_NOTIFICATIONS));
+        int fetchLimit = normalizedLimit + 1;
+
+        List<MonitoringNotificationResponse> notifications = notificationRepository
+                .findRecentByTargetUserIdWithCursor(userId, cursor, fetchLimit).stream()
+                .map(MonitoringNotificationResponse::fromProjection)
+                .toList();
+
+        boolean hasNext = notifications.size() > normalizedLimit;
+        List<MonitoringNotificationResponse> items = hasNext
+                ? notifications.subList(0, normalizedLimit)
+                : notifications;
+        Long nextCursor = hasNext && !items.isEmpty()
+                ? items.get(items.size() - 1).notificationId()
+                : null;
+
+        return new MonitoringNotificationPageResponse(items, nextCursor, hasNext);
+    }
+
     private MonitoringSession getOwnedSession(Long userId, Long sessionId) {
         MonitoringSession monitoringSession = monitoringSessionRepository.findByIdAndDeletedAtIsNull(sessionId)
                 .orElseThrow(() -> new CustomException(ErrorCode.MONITORING_SESSION_NOT_FOUND));
@@ -205,7 +253,11 @@ public class MonitoringServiceImpl implements MonitoringService {
         return MonitoringRealtimeSummaryResponse.from(projection);
     }
 
-    private void publishRealtimeSummaryUpdate(MonitoringSession monitoringSession, MonitoringEventResponse eventResponse) {
+    private void publishRealtimeSummaryUpdate(
+            MonitoringSession monitoringSession,
+            MonitoringEventResponse eventResponse,
+            MonitoringNotificationResponse notificationResponse
+    ) {
         if (monitoringSession.getMode() != MonitoringMode.ORGANIZATION) {
             return;
         }
@@ -224,11 +276,103 @@ public class MonitoringServiceImpl implements MonitoringService {
             if (eventResponse == null) {
                 return;
             }
-            if (eventResponse.eventType() == MonitoringEventType.DROWSY
-                    || eventResponse.eventType() == MonitoringEventType.SLEEP) {
-                monitoringRealtimeSseBroker.sendAlert(organizationId, eventResponse);
+            if (notificationResponse != null) {
+                monitoringRealtimeSseBroker.sendAlert(organizationId, notificationResponse);
             }
         });
+    }
+
+    private MonitoringNotificationResponse createNotificationIfRequired(
+            MonitoringSession monitoringSession,
+            MonitoringEventResponse eventResponse
+    ) {
+        if (monitoringSession.getMode() != MonitoringMode.ORGANIZATION) {
+            return null;
+        }
+        if (!isRiskEvent(eventResponse.eventType())) {
+            return null;
+        }
+
+        Long organizationId = findOrganizationIdByUserId(monitoringSession.getUserId());
+        if (organizationId == null) {
+            return null;
+        }
+
+        User sourceUser = userRepository.findByIdAndDeletedAtIsNull(monitoringSession.getUserId()).orElse(null);
+        String sourceUserName = resolveDisplayName(sourceUser, monitoringSession.getUserId());
+        List<Long> adminUserIds = resolveAdminUserIds(organizationId);
+        if (adminUserIds.isEmpty()) {
+            return null;
+        }
+
+        NotificationType notificationType = NotificationType.fromMonitoringEventType(eventResponse.eventType());
+        String content = buildNotificationContent(sourceUserName, notificationType);
+        List<Notification> notifications = adminUserIds.stream()
+                .map(targetUserId -> Notification.create(
+                        monitoringSession.getUserId(),
+                        targetUserId,
+                        content,
+                        notificationType
+                ))
+                .toList();
+
+        List<Notification> savedNotifications = notificationRepository.saveAll(notifications);
+        if (savedNotifications.isEmpty()) {
+            return null;
+        }
+
+        return MonitoringNotificationResponse.fromEntity(
+                savedNotifications.get(0),
+                sourceUserName,
+                eventResponse.occurredAtServer()
+        );
+    }
+
+    private Long findOrganizationIdByUserId(Long userId) {
+        return organizationMemberRepository.findFirstByUserIdAndDeletedAtIsNull(userId)
+                .map(OrganizationMember::getOrganizationId)
+                .orElse(null);
+    }
+
+    private List<Long> resolveAdminUserIds(Long organizationId) {
+        Set<Long> organizationUserIds = organizationMemberRepository
+                .findAllByOrganizationIdAndDeletedAtIsNullOrderByCreatedAtDesc(organizationId).stream()
+                .map(OrganizationMember::getUserId)
+                .collect(java.util.stream.Collectors.toSet());
+        if (organizationUserIds.isEmpty()) {
+            return List.of();
+        }
+
+        return userRepository.findAllByIdInAndRoleAndDeletedAtIsNull(organizationUserIds, UserRole.ADMIN).stream()
+                .map(User::getId)
+                .toList();
+    }
+
+    private String resolveDisplayName(User user, Long userId) {
+        if (user == null) {
+            return "사용자 " + userId;
+        }
+        if (StringUtils.hasText(user.getName())) {
+            return user.getName().trim();
+        }
+        if (StringUtils.hasText(user.getNickname())) {
+            return user.getNickname().trim();
+        }
+        if (StringUtils.hasText(user.getEmail())) {
+            return user.getEmail().trim();
+        }
+        return "사용자 " + userId;
+    }
+
+    private boolean isRiskEvent(MonitoringEventType eventType) {
+        return eventType == MonitoringEventType.DROWSY || eventType == MonitoringEventType.SLEEP;
+    }
+
+    private String buildNotificationContent(String sourceUserName, NotificationType notificationType) {
+        if (notificationType == NotificationType.SLEEP) {
+            return sourceUserName + " 사용자에게 수면 상태 경고가 감지되었습니다.";
+        }
+        return sourceUserName + " 사용자에게 졸음 의심 경고가 감지되었습니다.";
     }
 
     private void runAfterCommit(Runnable action) {

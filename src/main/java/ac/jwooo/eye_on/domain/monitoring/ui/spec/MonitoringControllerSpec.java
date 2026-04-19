@@ -1,10 +1,14 @@
 package ac.jwooo.eye_on.domain.monitoring.ui.spec;
 
+import java.util.List;
+
 import ac.jwooo.eye_on.domain.monitoring.application.dto.request.CreateMonitoringEventRequest;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.request.EndMonitoringSessionRequest;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.request.StartMonitoringSessionRequest;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringEventResponse;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringHourlyRisk24hResponse;
+import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringNotificationPageResponse;
+import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringRecentEndedSessionResponse;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringRealtimeSummaryResponse;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringSessionEndResponse;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringSessionStartResponse;
@@ -21,6 +25,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Tag(name = "Monitoring", description = "모니터링 세션/이벤트 API")
@@ -140,6 +145,127 @@ public interface MonitoringControllerSpec {
             @ApiResponse(responseCode = "403", description = "관리자 권한 없음")
     })
     MonitoringHourlyRisk24hResponse getHourlyRisk24h(Authentication authentication);
+
+    @Operation(
+            summary = "대시보드 최근 종료 세션 조회",
+            description = """
+                    **[ 최근 접속 세션 위젯 API ]**
+                    관리자 기준 소속 조직의 `ORGANIZATION` 모드 세션 중
+                    **현재 활성 세션(미종료)을 제외한 종료 세션만** 최신 순으로 조회합니다.
+                    
+                    - 정렬: `endedAtServer DESC`, `sessionId DESC`
+                    - 기본 조회 개수: `20`
+                    - 최대 조회 개수: `100` (요청값이 커도 서버에서 100으로 제한)
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "조회 성공",
+                    content = @Content(
+                            schema = @Schema(implementation = MonitoringRecentEndedSessionResponse.class),
+                            examples = @ExampleObject(
+                                    name = "recentEndedSessionsExample",
+                                    summary = "최근 종료 세션 응답 예시",
+                                    value = """
+                                            [
+                                              {
+                                                "sessionId": "123456789012345678",
+                                                "userId": "987654321012345678",
+                                                "userName": "홍길동",
+                                                "startedAtApp": "2026-04-18T08:20:00",
+                                                "endedAtApp": "2026-04-18T09:05:20",
+                                                "durationMinutes": 45,
+                                                "drowsyCount": 3,
+                                                "sleepCount": 1,
+                                                "totalRiskCount": 4
+                                              }
+                                            ]
+                                            """
+                            )
+                    )
+            ),
+            @ApiResponse(responseCode = "401", description = "인증 실패"),
+            @ApiResponse(responseCode = "403", description = "관리자 권한 없음"),
+            @ApiResponse(responseCode = "404", description = "조직 정보를 찾을 수 없음")
+    })
+    List<MonitoringRecentEndedSessionResponse> getRecentEndedSessions(
+            Authentication authentication,
+            @RequestParam
+            @Parameter(
+                    name = "limit",
+                    description = "조회 개수 (기본값: 20, 최대 100)",
+                    required = false,
+                    schema = @Schema(type = "integer", format = "int32", defaultValue = "20", example = "20")
+            )
+            int limit
+    );
+
+    @Operation(
+            summary = "대시보드 최근 알림 조회",
+            description = """
+                    **[ 실시간 알림 기록 API ]**
+                    관리자 본인(targetUserId)에게 전달된 최근 알림을 **커서 기반**으로 조회합니다.
+                    알림은 `DROWSY` / `SLEEP` 이벤트 발생 시 자동 저장됩니다.
+                    
+                    - 정렬: `notificationId DESC`
+                    - `cursor` 미지정: 최신 페이지
+                    - `cursor` 지정: 해당 ID보다 작은 알림부터 조회
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "조회 성공",
+                    content = @Content(
+                            schema = @Schema(implementation = MonitoringNotificationPageResponse.class),
+                            examples = @ExampleObject(
+                                    name = "recentNotificationsExample",
+                                    summary = "최근 알림 응답 예시",
+                                    value = """
+                                            {
+                                              "items": [
+                                                {
+                                                  "notificationId": "123456789012345678",
+                                                  "userId": "223456789012345678",
+                                                  "targetUserId": "323456789012345678",
+                                                  "userName": "홍길동",
+                                                  "type": "DROWSY",
+                                                  "content": "홍길동 사용자에게 졸음 의심 알림이 감지되었습니다.",
+                                                  "occurredAt": "2026-04-19T13:20:30"
+                                                }
+                                              ],
+                                              "nextCursor": "123456789012345678",
+                                              "hasNext": true
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @ApiResponse(responseCode = "401", description = "인증 실패"),
+            @ApiResponse(responseCode = "403", description = "관리자 권한 없음")
+    })
+    MonitoringNotificationPageResponse getRecentNotifications(
+            Authentication authentication,
+            @RequestParam
+            @Parameter(
+                    name = "cursor",
+                    description = "다음 페이지 조회 시작 커서(notificationId). 없으면 최신부터 조회",
+                    required = false,
+                    schema = @Schema(type = "integer", format = "int64", example = "123456789012345678")
+            )
+            Long cursor,
+            @RequestParam
+            @Parameter(
+                    name = "limit",
+                    description = "조회 개수 (기본값: 50, 최대 200)",
+                    required = false,
+                    schema = @Schema(type = "integer", format = "int32", defaultValue = "50", example = "50")
+            )
+            int limit
+    );
 
     @Operation(
             summary = "모니터링 시작",

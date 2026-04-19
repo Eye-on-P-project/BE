@@ -1,8 +1,12 @@
-package ac.example.eye.on;
+package ac.jwooo.eye_on;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
+@ConfigurationPropertiesScan
+@EnableScheduling
 @SpringBootApplication
 public class EyeOnApplication {
 

@@ -10,12 +10,19 @@ public record CorsProperties(String allowedOrigins) {
 
     public List<String> allowedOriginList() {
         if (allowedOrigins == null || allowedOrigins.isBlank()) {
-            return List.of("*");
+            return List.of("http://localhost:5173");
         }
-        return Arrays.stream(allowedOrigins.split(","))
+        List<String> origins = Arrays.stream(allowedOrigins.split(","))
                 .map(String::trim)
                 .filter(value -> !value.isBlank())
                 .toList();
+
+        if (origins.stream().anyMatch("*"::equals)) {
+            throw new IllegalStateException(
+                    "app.cors.allowed-origins does not support '*' when credentials are enabled. Use explicit origins."
+            );
+        }
+
+        return origins;
     }
 }
-

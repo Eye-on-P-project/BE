@@ -4,9 +4,11 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
 
-import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringEventResponse;
+import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringNotificationResponse;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringRealtimeSummaryResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -20,23 +22,20 @@ public class MonitoringRealtimeSseBroker {
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private static final long SSE_TIMEOUT_MS = 0L;
 
-    private final Map<Long, SseEmitter> emittersByOrganizationId = new ConcurrentHashMap<>();
+    private final Map<Long, Set<SseEmitter>> emittersByOrganizationId = new ConcurrentHashMap<>();
 
     public SseEmitter connect(Long organizationId) {
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
 
-        SseEmitter existingEmitter = emittersByOrganizationId.put(organizationId, emitter);
-        if (existingEmitter != null) {
-            existingEmitter.complete();
-        }
+        emittersByOrganizationId.computeIfAbsent(organizationId, id -> new CopyOnWriteArraySet<>()).add(emitter);
 
-        emitter.onCompletion(() -> emittersByOrganizationId.remove(organizationId, emitter));
+        emitter.onCompletion(() -> removeEmitter(organizationId, emitter));
         emitter.onTimeout(() -> {
-            emittersByOrganizationId.remove(organizationId, emitter);
+            removeEmitter(organizationId, emitter);
             emitter.complete();
         });
         emitter.onError(exception -> {
-            emittersByOrganizationId.remove(organizationId, emitter);
+            removeEmitter(organizationId, emitter);
             emitter.completeWithError(exception);
         });
 
@@ -51,8 +50,8 @@ public class MonitoringRealtimeSseBroker {
         send(organizationId, "summary", summary);
     }
 
-    public void sendAlert(Long organizationId, MonitoringEventResponse eventResponse) {
-        send(organizationId, "alert", eventResponse);
+    public void sendAlert(Long organizationId, MonitoringNotificationResponse notificationResponse) {
+        send(organizationId, "alert", notificationResponse);
     }
 
     @Scheduled(fixedDelay = 15000)
@@ -64,17 +63,26 @@ public class MonitoringRealtimeSseBroker {
     }
 
     private void send(Long organizationId, String eventName, Object data) {
-        SseEmitter emitter = emittersByOrganizationId.get(organizationId);
-        if (emitter == null) {
+        Set<SseEmitter> emitters = emittersByOrganizationId.get(organizationId);
+        if (emitters == null || emitters.isEmpty()) {
             return;
         }
 
-        try {
-            emitter.send(SseEmitter.event().name(eventName).data(data));
-        } catch (IOException | IllegalStateException exception) {
-            log.debug("SSE send failed. orgId={}, event={}", organizationId, eventName, exception);
-            emittersByOrganizationId.remove(organizationId, emitter);
-            emitter.complete();
+        for (SseEmitter emitter : emitters) {
+            try {
+                emitter.send(SseEmitter.event().name(eventName).data(data));
+            } catch (IOException | IllegalStateException exception) {
+                log.debug("SSE send failed. orgId={}, event={}", organizationId, eventName, exception);
+                removeEmitter(organizationId, emitter);
+                emitter.complete();
+            }
         }
+    }
+
+    private void removeEmitter(Long organizationId, SseEmitter emitter) {
+        emittersByOrganizationId.computeIfPresent(organizationId, (id, emitters) -> {
+            emitters.remove(emitter);
+            return emitters.isEmpty() ? null : emitters;
+        });
     }
 }

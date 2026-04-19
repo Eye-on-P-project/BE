@@ -8,7 +8,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 
 import ac.jwooo.eye_on.domain.monitoring.application.dto.request.CreateMonitoringEventRequest;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.request.EndMonitoringSessionRequest;
@@ -32,11 +31,9 @@ import ac.jwooo.eye_on.domain.monitoring.domain.repository.MonitoringSessionReal
 import ac.jwooo.eye_on.domain.monitoring.domain.repository.MonitoringSessionRepository;
 import ac.jwooo.eye_on.domain.monitoring.domain.repository.NotificationRepository;
 import ac.jwooo.eye_on.domain.monitoring.domain.repository.TimeBucketRiskCountProjection;
-import ac.jwooo.eye_on.domain.organization.domain.entity.OrganizationMember;
 import ac.jwooo.eye_on.domain.organization.domain.repository.OrganizationMemberRepository;
 import ac.jwooo.eye_on.domain.organization.domain.service.OrganizationAccessService;
 import ac.jwooo.eye_on.domain.user.domain.entity.User;
-import ac.jwooo.eye_on.domain.user.domain.entity.UserRole;
 import ac.jwooo.eye_on.domain.user.domain.repository.UserRepository;
 import ac.jwooo.eye_on.global.exception.CustomException;
 import ac.jwooo.eye_on.global.exception.ErrorCode;
@@ -216,12 +213,12 @@ public class MonitoringServiceImpl implements MonitoringService {
 
     @Override
     public MonitoringNotificationPageResponse getRecentNotifications(Long userId, Long cursor, int limit) {
-        organizationAccessService.resolveOwnedOrganization(userId);
+        Long organizationId = organizationAccessService.resolveOwnedOrganization(userId).getId();
         int normalizedLimit = Math.max(1, Math.min(limit, MAX_RECENT_NOTIFICATIONS));
         int fetchLimit = normalizedLimit + 1;
 
         List<MonitoringNotificationResponse> notifications = notificationRepository
-                .findRecentByTargetUserIdWithCursor(userId, cursor, fetchLimit).stream()
+                .findRecentByOrganizationIdWithCursor(organizationId, cursor, fetchLimit).stream()
                 .map(MonitoringNotificationResponse::fromProjection)
                 .toList();
 
@@ -293,59 +290,23 @@ public class MonitoringServiceImpl implements MonitoringService {
             return null;
         }
 
-        Long organizationId = findOrganizationIdByUserId(monitoringSession.getUserId());
-        if (organizationId == null) {
-            return null;
-        }
-
         User sourceUser = userRepository.findByIdAndDeletedAtIsNull(monitoringSession.getUserId()).orElse(null);
         String sourceUserName = resolveDisplayName(sourceUser, monitoringSession.getUserId());
-        List<Long> adminUserIds = resolveAdminUserIds(organizationId);
-        if (adminUserIds.isEmpty()) {
-            return null;
-        }
 
         NotificationType notificationType = NotificationType.fromMonitoringEventType(eventResponse.eventType());
         String content = buildNotificationContent(sourceUserName, notificationType);
-        List<Notification> notifications = adminUserIds.stream()
-                .map(targetUserId -> Notification.create(
-                        monitoringSession.getUserId(),
-                        targetUserId,
-                        content,
-                        notificationType
-                ))
-                .toList();
-
-        List<Notification> savedNotifications = notificationRepository.saveAll(notifications);
-        if (savedNotifications.isEmpty()) {
-            return null;
-        }
+        Notification savedNotification = notificationRepository.save(Notification.create(
+                monitoringSession.getUserId(),
+                monitoringSession.getUserId(),
+                content,
+                notificationType
+        ));
 
         return MonitoringNotificationResponse.fromEntity(
-                savedNotifications.get(0),
+                savedNotification,
                 sourceUserName,
                 eventResponse.occurredAtServer()
         );
-    }
-
-    private Long findOrganizationIdByUserId(Long userId) {
-        return organizationMemberRepository.findFirstByUserIdAndDeletedAtIsNull(userId)
-                .map(OrganizationMember::getOrganizationId)
-                .orElse(null);
-    }
-
-    private List<Long> resolveAdminUserIds(Long organizationId) {
-        Set<Long> organizationUserIds = organizationMemberRepository
-                .findAllByOrganizationIdAndDeletedAtIsNullOrderByCreatedAtDesc(organizationId).stream()
-                .map(OrganizationMember::getUserId)
-                .collect(java.util.stream.Collectors.toSet());
-        if (organizationUserIds.isEmpty()) {
-            return List.of();
-        }
-
-        return userRepository.findAllByIdInAndRoleAndDeletedAtIsNull(organizationUserIds, UserRole.ADMIN).stream()
-                .map(User::getId)
-                .toList();
     }
 
     private String resolveDisplayName(User user, Long userId) {

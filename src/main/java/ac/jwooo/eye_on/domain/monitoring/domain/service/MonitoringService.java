@@ -7,7 +7,6 @@ import ac.jwooo.eye_on.domain.monitoring.application.dto.request.EndMonitoringSe
 import ac.jwooo.eye_on.domain.monitoring.application.dto.request.StartMonitoringSessionRequest;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringEventResponse;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringHourlyRisk24hResponse;
-import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringNotificationResponse;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringNotificationPageResponse;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringRecentEndedSessionResponse;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringRealtimeSummaryResponse;

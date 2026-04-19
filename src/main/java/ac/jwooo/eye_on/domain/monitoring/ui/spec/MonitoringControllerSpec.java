@@ -88,7 +88,7 @@ public interface MonitoringControllerSpec {
                     ### 📤 이벤트 (Output)
                     - `connected`: 연결 직후
                     - `summary`: 최신 요약 값 (`MonitoringRealtimeSummaryResponse`)
-                    - `alert`: `DROWSY`/`SLEEP` 이벤트 발생 상세
+                    - `alert`: `DROWSY`/`SLEEP` 알림 (`MonitoringNotificationResponse`)
                     - `heartbeat`: 연결 유지용 하트비트
                     """,
             security = @SecurityRequirement(name = "bearerAuth")
@@ -206,7 +206,7 @@ public interface MonitoringControllerSpec {
             summary = "대시보드 최근 알림 조회",
             description = """
                     **[ 실시간 알림 기록 API ]**
-                    관리자 본인(targetUserId)에게 전달된 최근 알림을 **커서 기반**으로 조회합니다.
+                    관리자 기준 **소속 조직 전체 알림**을 **커서 기반**으로 조회합니다.
                     알림은 `DROWSY` / `SLEEP` 이벤트 발생 시 자동 저장됩니다.
                     
                     - 정렬: `notificationId DESC`
@@ -230,7 +230,7 @@ public interface MonitoringControllerSpec {
                                                 {
                                                   "notificationId": "123456789012345678",
                                                   "userId": "223456789012345678",
-                                                  "targetUserId": "323456789012345678",
+                                                  "targetUserId": "223456789012345678",
                                                   "userName": "홍길동",
                                                   "type": "DROWSY",
                                                   "content": "홍길동 사용자에게 졸음 의심 알림이 감지되었습니다.",

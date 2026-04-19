@@ -2,6 +2,7 @@ package ac.jwooo.eye_on.domain.monitoring.domain.service;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -49,6 +50,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @Transactional(readOnly = true)
 public class MonitoringServiceImpl implements MonitoringService {
 
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private static final int MAX_RECENT_NOTIFICATIONS = 200;
 
     private final MonitoringSessionRepository monitoringSessionRepository;
@@ -375,7 +377,7 @@ public class MonitoringServiceImpl implements MonitoringService {
     }
 
     private LocalDateTime nowWithoutNanos() {
-        return LocalDateTime.now().withNano(0);
+        return LocalDateTime.now(KST).withNano(0);
     }
 
     private LocalDateTime truncateToSeconds(LocalDateTime value) {

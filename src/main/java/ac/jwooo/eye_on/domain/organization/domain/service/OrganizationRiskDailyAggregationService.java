@@ -2,6 +2,7 @@ package ac.jwooo.eye_on.domain.organization.domain.service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -24,6 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class OrganizationRiskDailyAggregationService {
+
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final MonitoringSessionRepository monitoringSessionRepository;
     private final MonitoringEventLogRepository monitoringEventLogRepository;
@@ -88,7 +91,7 @@ public class OrganizationRiskDailyAggregationService {
 
     @Transactional
     public void aggregateRecentDays(int days) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(KST);
         for (int offset = 1; offset <= days; offset++) {
             aggregateForDate(today.minusDays(offset));
         }

@@ -21,7 +21,8 @@ import lombok.NoArgsConstructor;
 @Table(
         name = "monitoring_event_logs",
         indexes = {
-                @Index(name = "idx_mel_session_latest", columnList = "session_id,deleted_at,occurred_at_app,id,event_type")
+                @Index(name = "idx_mel_session_latest", columnList = "session_id,deleted_at,occurred_at_app,id,event_type"),
+                @Index(name = "idx_mel_range_event", columnList = "occurred_at_app,event_type,deleted_at,session_id")
         }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

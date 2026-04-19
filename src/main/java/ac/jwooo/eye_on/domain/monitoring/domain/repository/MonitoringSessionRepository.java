@@ -2,6 +2,7 @@ package ac.jwooo.eye_on.domain.monitoring.domain.repository;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDateTime;
 
 import ac.jwooo.eye_on.domain.monitoring.domain.entity.MonitoringSession;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -61,6 +62,7 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
                       ON latest_event.session_id = ms.id
                     WHERE ms.ended_at_server IS NULL
                       AND ms.deleted_at IS NULL
+                      AND ms.mode = 'ORGANIZATION'
                     """,
             nativeQuery = true
     )
@@ -84,6 +86,7 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
                     LEFT JOIN monitoring_sessions ms
                       ON ms.user_id = m.user_id
                      AND ms.deleted_at IS NULL
+                     AND ms.mode = 'ORGANIZATION'
                     WHERE m.organization_id = :organizationId
                       AND m.deleted_at IS NULL
                     GROUP BY m.user_id, u.email, u.name, u.nickname
@@ -92,4 +95,77 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
             nativeQuery = true
     )
     List<OrganizationRiskUserProjection> findRiskUsersByOrganizationId(@Param("organizationId") Long organizationId);
+
+    @Query(
+            value = """
+                    SELECT
+                        YEAR(ms.started_at_app) AS year,
+                        MONTH(ms.started_at_app) AS month,
+                        DAY(ms.started_at_app) AS day,
+                        HOUR(ms.started_at_app) AS hour,
+                        COUNT(ms.id) AS sessionCount
+                    FROM monitoring_sessions ms
+                    JOIN member m
+                      ON m.user_id = ms.user_id
+                     AND m.organization_id = :organizationId
+                     AND m.deleted_at IS NULL
+                    WHERE ms.deleted_at IS NULL
+                      AND ms.mode = 'ORGANIZATION'
+                      AND ms.started_at_app >= :rangeStart
+                      AND ms.started_at_app < :rangeEndExclusive
+                    GROUP BY YEAR(ms.started_at_app), MONTH(ms.started_at_app), DAY(ms.started_at_app), HOUR(ms.started_at_app)
+                    ORDER BY year ASC, month ASC, day ASC, hour ASC
+                    """,
+            nativeQuery = true
+    )
+    List<TimeBucketSessionCountProjection> findHourlySessionCountsByOrganizationAndRange(
+            @Param("organizationId") Long organizationId,
+            @Param("rangeStart") LocalDateTime rangeStart,
+            @Param("rangeEndExclusive") LocalDateTime rangeEndExclusive
+    );
+
+    @Query(
+            value = """
+                    SELECT
+                        m.organization_id AS organizationId,
+                        COUNT(ms.id) AS sessionCount
+                    FROM monitoring_sessions ms
+                    JOIN member m
+                      ON m.user_id = ms.user_id
+                     AND m.deleted_at IS NULL
+                    WHERE ms.deleted_at IS NULL
+                      AND ms.mode = 'ORGANIZATION'
+                      AND ms.started_at_app >= :rangeStart
+                      AND ms.started_at_app < :rangeEndExclusive
+                    GROUP BY m.organization_id
+                    """,
+            nativeQuery = true
+    )
+    List<OrganizationSessionCountProjection> findOrganizationSessionCountsByRange(
+            @Param("rangeStart") LocalDateTime rangeStart,
+            @Param("rangeEndExclusive") LocalDateTime rangeEndExclusive
+    );
+
+    @Query(
+            value = """
+                    SELECT
+                        :organizationId AS organizationId,
+                        COUNT(ms.id) AS sessionCount
+                    FROM monitoring_sessions ms
+                    JOIN member m
+                      ON m.user_id = ms.user_id
+                     AND m.organization_id = :organizationId
+                     AND m.deleted_at IS NULL
+                    WHERE ms.deleted_at IS NULL
+                      AND ms.mode = 'ORGANIZATION'
+                      AND ms.started_at_app >= :rangeStart
+                      AND ms.started_at_app < :rangeEndExclusive
+                    """,
+            nativeQuery = true
+    )
+    OrganizationSessionCountProjection findSingleOrganizationSessionCountByRange(
+            @Param("organizationId") Long organizationId,
+            @Param("rangeStart") LocalDateTime rangeStart,
+            @Param("rangeEndExclusive") LocalDateTime rangeEndExclusive
+    );
 }

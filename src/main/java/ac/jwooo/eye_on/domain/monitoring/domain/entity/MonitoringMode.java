@@ -5,6 +5,7 @@ import java.util.Locale;
 import com.fasterxml.jackson.annotation.JsonCreator;
 
 public enum MonitoringMode {
+    ORGANIZATION,
     DRIVING,
     STUDY;
 
@@ -17,4 +18,3 @@ public enum MonitoringMode {
         return MonitoringMode.valueOf(value.trim().toUpperCase(Locale.ROOT));
     }
 }
-

@@ -4,6 +4,7 @@ import ac.jwooo.eye_on.domain.monitoring.application.dto.request.CreateMonitorin
 import ac.jwooo.eye_on.domain.monitoring.application.dto.request.EndMonitoringSessionRequest;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.request.StartMonitoringSessionRequest;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringEventResponse;
+import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringHourlyRisk24hResponse;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringRealtimeSummaryResponse;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringSessionEndResponse;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringSessionStartResponse;
@@ -20,6 +21,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Tag(name = "Monitoring", description = "모니터링 세션/이벤트 API")
 public interface MonitoringControllerSpec {
@@ -35,10 +37,10 @@ public interface MonitoringControllerSpec {
                     
                     ### 📤 출력 (Output)
                     - `totalMemberCount`: 조직 내 활성 구성원 수
-                    - `activeSessionCount`: 현재 종료되지 않은 모니터링 세션 수
-                    - `warningSessionCount`: 활성 세션 중 최신 상태가 졸음/수면인 세션 수
-                    - `drowsyWarningSessionCount`: 활성 세션 중 최신 상태가 졸음인 세션 수
-                    - `sleepWarningSessionCount`: 활성 세션 중 최신 상태가 수면인 세션 수
+                    - `activeSessionCount`: 현재 종료되지 않은 **ORGANIZATION 모드** 세션 수
+                    - `warningSessionCount`: 활성 ORGANIZATION 세션 중 최신 상태가 졸음/수면인 세션 수
+                    - `drowsyWarningSessionCount`: 활성 ORGANIZATION 세션 중 최신 상태가 졸음인 세션 수
+                    - `sleepWarningSessionCount`: 활성 ORGANIZATION 세션 중 최신 상태가 수면인 세션 수
                     """,
             security = @SecurityRequirement(name = "bearerAuth")
     )
@@ -70,6 +72,76 @@ public interface MonitoringControllerSpec {
     MonitoringRealtimeSummaryResponse getRealtimeSummary(Authentication authentication);
 
     @Operation(
+            summary = "대시보드 실시간 요약 SSE 구독",
+            description = """
+                    **[ 대시보드 실시간 요약 SSE API ]**
+                    관리자 기준 소속 조직의 실시간 요약 변화를 SSE로 구독합니다.
+                    
+                    ### 📥 입력 (Input)
+                    - `Authorization: Bearer {accessToken}` 헤더 (필수, 관리자 계정)
+                    
+                    ### 📤 이벤트 (Output)
+                    - `connected`: 연결 직후
+                    - `summary`: 최신 요약 값 (`MonitoringRealtimeSummaryResponse`)
+                    - `alert`: `DROWSY`/`SLEEP` 이벤트 발생 상세
+                    - `heartbeat`: 연결 유지용 하트비트
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "SSE 연결 성공"),
+            @ApiResponse(responseCode = "401", description = "인증 실패"),
+            @ApiResponse(responseCode = "403", description = "관리자 권한 없음"),
+            @ApiResponse(responseCode = "404", description = "조직 정보를 찾을 수 없음")
+    })
+    SseEmitter subscribeRealtimeSummary(Authentication authentication);
+
+    @Operation(
+            summary = "대시보드 최근 24시간 시간대별 위험 건수 조회",
+            description = """
+                    **[ 최근 24시간 위험 시간대 집계 API ]**
+                    관리자 기준 소속 조직의 모든 구성원/모든 세션을 대상으로
+                    현재 시각 기준 최근 24시간의 시간대(1시간)별 `졸음 + 수면` 발생 건수를 조회합니다.
+                    집계 대상은 `ORGANIZATION` 모드 세션만 포함합니다.
+                    
+                    - 이벤트 시각 기준: `occurredAtApp`
+                    - 포함 이벤트: `DROWSY`, `SLEEP`
+                    - 진행 중 세션 이벤트 포함
+                    - 결과는 24개 버킷(0건 포함)으로 고정 반환
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "조회 성공",
+                    content = @Content(
+                            schema = @Schema(implementation = MonitoringHourlyRisk24hResponse.class),
+                            examples = @ExampleObject(
+                                    name = "hourlyRisk24hResponseExample",
+                                    summary = "최근 24시간 시간대별 위험 건수",
+                                    value = """
+                                            {
+                                              "rangeStart": "2026-04-18T13:00:00",
+                                              "rangeEnd": "2026-04-19T12:59:59",
+                                              "buckets": [
+                                                {
+                                                  "bucketStart": "2026-04-19T11:00:00",
+                                                  "bucketEnd": "2026-04-19T11:59:59",
+                                                  "totalRiskCount": 4
+                                                }
+                                              ]
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @ApiResponse(responseCode = "401", description = "인증 실패"),
+            @ApiResponse(responseCode = "403", description = "관리자 권한 없음")
+    })
+    MonitoringHourlyRisk24hResponse getHourlyRisk24h(Authentication authentication);
+
+    @Operation(
             summary = "모니터링 시작",
             description = """
                     **[ 모니터링 시작 API ]**
@@ -77,7 +149,7 @@ public interface MonitoringControllerSpec {
                     
                     ### 📥 입력 (Input)
                     - `Authorization: Bearer {accessToken}` 헤더 (필수)
-                    - `mode`: 모니터링 모드 (`DRIVING` | `STUDY`)
+                    - `mode`: 모니터링 모드 (`ORGANIZATION` | `DRIVING` | `STUDY`)
                     - `startedAtApp`: 앱에서 측정한 시작 시각 (`yyyy-MM-dd'T'HH:mm:ss`)
                     
                     ### ⚠️ 동작 규칙

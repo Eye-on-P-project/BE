@@ -4,9 +4,11 @@ import ac.jwooo.eye_on.domain.monitoring.application.dto.request.CreateMonitorin
 import ac.jwooo.eye_on.domain.monitoring.application.dto.request.EndMonitoringSessionRequest;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.request.StartMonitoringSessionRequest;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringEventResponse;
+import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringHourlyRisk24hResponse;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringRealtimeSummaryResponse;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringSessionEndResponse;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringSessionStartResponse;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 public interface MonitoringService {
 
@@ -17,4 +19,8 @@ public interface MonitoringService {
     MonitoringEventResponse createEvent(Long userId, Long sessionId, CreateMonitoringEventRequest request);
 
     MonitoringRealtimeSummaryResponse getRealtimeSummary(Long userId);
+
+    SseEmitter subscribeRealtimeSummary(Long userId);
+
+    MonitoringHourlyRisk24hResponse getHourlyRisk24h(Long userId);
 }

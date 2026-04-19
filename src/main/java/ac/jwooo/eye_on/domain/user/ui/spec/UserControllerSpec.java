@@ -112,6 +112,7 @@ public interface UserControllerSpec {
             @ApiResponse(responseCode = "409", description = "입력한 조직 코드가 이미 존재함")
     })
     OrganizationRecordResponse createOrganizationRecord(
+            Authentication authentication,
             @RequestBody(
                     required = true,
                     description = "조직 코드를 생성하기 위한 정보",
@@ -171,7 +172,7 @@ public interface UserControllerSpec {
                     )
             )
     })
-    List<OrganizationRecordResponse> getOrganizationRecords();
+    List<OrganizationRecordResponse> getOrganizationRecords(Authentication authentication);
 
     @Operation(
             summary = "개발용 조직 레코드 삭제",
@@ -201,5 +202,5 @@ public interface UserControllerSpec {
             ),
             @ApiResponse(responseCode = "404", description = "존재하지 않거나 이미 삭제된 조직 레코드 ID")
     })
-    Map<String, Object> deleteOrganizationRecord(Long organizationRecordId);
+    Map<String, Object> deleteOrganizationRecord(Authentication authentication, Long organizationRecordId);
 }

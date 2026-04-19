@@ -29,6 +29,7 @@ public class SecurityConfig {
     private final RestAuthenticationEntryPoint authenticationEntryPoint;
     private final RestAccessDeniedHandler accessDeniedHandler;
     private final CorsProperties corsProperties;
+    private final SecurityProperties securityProperties;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -41,21 +42,28 @@ public class SecurityConfig {
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
-                .authorizeHttpRequests(authorize -> authorize
-                        .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR, DispatcherType.FORWARD).permitAll()
-                        .requestMatchers("/error").permitAll()
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/api/auth/signup", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout").permitAll()
-                        .requestMatchers("/api/users/dev/organizations", "/api/users/dev/organizations/**").permitAll()
-                        .requestMatchers("/actuator/health").permitAll()
-                        // Swagger UI
-                        .requestMatchers(
+                .authorizeHttpRequests(authorize -> {
+                    authorize.dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR, DispatcherType.FORWARD).permitAll();
+                    authorize.requestMatchers("/error").permitAll();
+                    authorize.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
+                    authorize.requestMatchers("/api/auth/signup", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout").permitAll();
+                    authorize.requestMatchers("/actuator/health").permitAll();
+
+                    if (securityProperties.exposeDevApi()) {
+                        authorize.requestMatchers("/api/users/dev/organizations", "/api/users/dev/organizations/**").permitAll();
+                    }
+
+                    if (securityProperties.exposeSwagger()) {
+                        authorize.requestMatchers(
                                 "/swagger-ui.html",
                                 "/swagger-ui/**",
                                 "/v3/api-docs",
                                 "/v3/api-docs/**"
-                        ).permitAll()
-                        .anyRequest().authenticated())
+                        ).permitAll();
+                    }
+
+                    authorize.anyRequest().authenticated();
+                })
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

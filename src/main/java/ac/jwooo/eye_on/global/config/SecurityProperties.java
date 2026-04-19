@@ -8,7 +8,8 @@ public record SecurityProperties(
         boolean cookieSecure,
         String cookieSameSite,
         String cookiePath,
-        String cookieDomain
+        String cookieDomain,
+        boolean exposeSwagger,
+        boolean exposeDevApi
 ) {
 }
-

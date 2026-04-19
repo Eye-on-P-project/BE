@@ -64,8 +64,20 @@ public class MonitoringServiceImpl implements MonitoringService {
     @Override
     @Transactional
     public MonitoringSessionStartResponse startSession(Long userId, StartMonitoringSessionRequest request) {
-        if (monitoringSessionRepository.existsByUserIdAndEndedAtServerIsNullAndDeletedAtIsNull(userId)) {
-            throw new CustomException(ErrorCode.MONITORING_SESSION_ALREADY_ACTIVE);
+        LocalDateTime now = nowWithoutNanos();
+        List<MonitoringSession> activeSessions = monitoringSessionRepository
+                .findByUserIdAndEndedAtServerIsNullAndDeletedAtIsNull(userId);
+
+        // 모바일 네트워크/토큰 이슈로 종료 요청이 누락된 경우를 복구하기 위해
+        // 기존 active 세션들을 현재 시각으로 종료하고 새 세션을 시작한다.
+        for (MonitoringSession activeSession : activeSessions) {
+            LocalDateTime endedAtApp = now.isBefore(activeSession.getStartedAtApp())
+                    ? activeSession.getStartedAtApp()
+                    : now;
+            long durationMinutesLong = Duration.between(activeSession.getStartedAtApp(), endedAtApp).toMinutes();
+            int durationMinutes = (int) Math.min(Math.max(durationMinutesLong, 0L), Integer.MAX_VALUE);
+            activeSession.end(endedAtApp, now, durationMinutes);
+            publishRealtimeSummaryUpdate(activeSession, null, null);
         }
 
         LocalDateTime startedAtApp = truncateToSeconds(request.startedAtApp());
@@ -74,7 +86,7 @@ public class MonitoringServiceImpl implements MonitoringService {
                 userId,
                 request.mode(),
                 startedAtApp,
-                nowWithoutNanos()
+                now
         );
 
         MonitoringSession savedMonitoringSession = monitoringSessionRepository.save(monitoringSession);
@@ -164,7 +176,7 @@ public class MonitoringServiceImpl implements MonitoringService {
     public MonitoringHourlyRisk24hResponse getHourlyRisk24h(Long userId) {
         Long organizationId = organizationAccessService.resolveOwnedOrganization(userId).getId();
 
-        LocalDateTime now = LocalDateTime.now(KST).withNano(0);
+        LocalDateTime now = nowWithoutNanos();
         LocalDateTime endExclusive = now.truncatedTo(java.time.temporal.ChronoUnit.HOURS).plusHours(1);
         LocalDateTime rangeStart = endExclusive.minusHours(24);
 
@@ -365,7 +377,7 @@ public class MonitoringServiceImpl implements MonitoringService {
     }
 
     private LocalDateTime nowWithoutNanos() {
-        return LocalDateTime.now().withNano(0);
+        return LocalDateTime.now(KST).withNano(0);
     }
 
     private LocalDateTime truncateToSeconds(LocalDateTime value) {

@@ -6,8 +6,8 @@ services:
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-eye_on}
       MYSQL_USER: ${MYSQL_USER:-eyeon}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-eyeon1234}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root1234}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       TZ: Asia/Seoul
     ports:
       - "${MYSQL_PORT:-3306}:3306"
@@ -24,7 +24,7 @@ services:
     container_name: eyeon-redis
     restart: unless-stopped
     environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis1234}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
     command: ["sh", "-c", "redis-server --appendonly yes --requirepass \"$${REDIS_PASSWORD}\""]
     ports:
       - "${REDIS_PORT:-6379}:6379"

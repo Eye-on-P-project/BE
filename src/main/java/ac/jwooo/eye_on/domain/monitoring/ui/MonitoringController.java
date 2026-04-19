@@ -1,9 +1,14 @@
 package ac.jwooo.eye_on.domain.monitoring.ui;
 
+import java.util.List;
+
 import ac.jwooo.eye_on.domain.monitoring.application.dto.request.CreateMonitoringEventRequest;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.request.EndMonitoringSessionRequest;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.request.StartMonitoringSessionRequest;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringEventResponse;
+import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringHourlyRisk24hResponse;
+import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringNotificationPageResponse;
+import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringRecentEndedSessionResponse;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringRealtimeSummaryResponse;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringSessionEndResponse;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringSessionStartResponse;
@@ -14,13 +19,16 @@ import ac.jwooo.eye_on.global.exception.ErrorCode;
 import ac.jwooo.eye_on.global.security.AuthenticatedUser;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
 @RequestMapping("/api/monitoring")
@@ -32,6 +40,33 @@ public class MonitoringController implements MonitoringControllerSpec {
     @GetMapping("/dashboard/realtime-summary")
     public MonitoringRealtimeSummaryResponse getRealtimeSummary(Authentication authentication) {
         return monitoringService.getRealtimeSummary(extractUserId(authentication));
+    }
+
+    @GetMapping(value = "/dashboard/realtime-summary/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter subscribeRealtimeSummary(Authentication authentication) {
+        return monitoringService.subscribeRealtimeSummary(extractUserId(authentication));
+    }
+
+    @GetMapping("/dashboard/hourly-risk-24h")
+    public MonitoringHourlyRisk24hResponse getHourlyRisk24h(Authentication authentication) {
+        return monitoringService.getHourlyRisk24h(extractUserId(authentication));
+    }
+
+    @GetMapping("/dashboard/recent-ended-sessions")
+    public List<MonitoringRecentEndedSessionResponse> getRecentEndedSessions(
+            Authentication authentication,
+            @RequestParam(defaultValue = "20") int limit
+    ) {
+        return monitoringService.getRecentEndedSessions(extractUserId(authentication), limit);
+    }
+
+    @GetMapping("/dashboard/notifications")
+    public MonitoringNotificationPageResponse getRecentNotifications(
+            Authentication authentication,
+            @RequestParam(required = false) Long cursor,
+            @RequestParam(defaultValue = "50") int limit
+    ) {
+        return monitoringService.getRecentNotifications(extractUserId(authentication), cursor, limit);
     }
 
     @PostMapping("/sessions/start")

@@ -1,9 +1,14 @@
 package ac.jwooo.eye_on.domain.monitoring.ui.spec;
 
+import java.util.List;
+
 import ac.jwooo.eye_on.domain.monitoring.application.dto.request.CreateMonitoringEventRequest;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.request.EndMonitoringSessionRequest;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.request.StartMonitoringSessionRequest;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringEventResponse;
+import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringHourlyRisk24hResponse;
+import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringNotificationPageResponse;
+import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringRecentEndedSessionResponse;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringRealtimeSummaryResponse;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringSessionEndResponse;
 import ac.jwooo.eye_on.domain.monitoring.application.dto.response.MonitoringSessionStartResponse;
@@ -20,6 +25,8 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Tag(name = "Monitoring", description = "모니터링 세션/이벤트 API")
 public interface MonitoringControllerSpec {
@@ -35,10 +42,10 @@ public interface MonitoringControllerSpec {
                     
                     ### 📤 출력 (Output)
                     - `totalMemberCount`: 조직 내 활성 구성원 수
-                    - `activeSessionCount`: 현재 종료되지 않은 모니터링 세션 수
-                    - `warningSessionCount`: 활성 세션 중 최신 상태가 졸음/수면인 세션 수
-                    - `drowsyWarningSessionCount`: 활성 세션 중 최신 상태가 졸음인 세션 수
-                    - `sleepWarningSessionCount`: 활성 세션 중 최신 상태가 수면인 세션 수
+                    - `activeSessionCount`: 현재 종료되지 않은 **ORGANIZATION 모드** 세션 수
+                    - `warningSessionCount`: 활성 ORGANIZATION 세션 중 최신 상태가 졸음/수면인 세션 수
+                    - `drowsyWarningSessionCount`: 활성 ORGANIZATION 세션 중 최신 상태가 졸음인 세션 수
+                    - `sleepWarningSessionCount`: 활성 ORGANIZATION 세션 중 최신 상태가 수면인 세션 수
                     """,
             security = @SecurityRequirement(name = "bearerAuth")
     )
@@ -70,6 +77,197 @@ public interface MonitoringControllerSpec {
     MonitoringRealtimeSummaryResponse getRealtimeSummary(Authentication authentication);
 
     @Operation(
+            summary = "대시보드 실시간 요약 SSE 구독",
+            description = """
+                    **[ 대시보드 실시간 요약 SSE API ]**
+                    관리자 기준 소속 조직의 실시간 요약 변화를 SSE로 구독합니다.
+                    
+                    ### 📥 입력 (Input)
+                    - `Authorization: Bearer {accessToken}` 헤더 (필수, 관리자 계정)
+                    
+                    ### 📤 이벤트 (Output)
+                    - `connected`: 연결 직후
+                    - `summary`: 최신 요약 값 (`MonitoringRealtimeSummaryResponse`)
+                    - `alert`: `NORMAL`/`DROWSY`/`SLEEP` 알림 (`MonitoringNotificationResponse`)
+                    - `heartbeat`: 연결 유지용 하트비트
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "SSE 연결 성공"),
+            @ApiResponse(responseCode = "401", description = "인증 실패"),
+            @ApiResponse(responseCode = "403", description = "관리자 권한 없음"),
+            @ApiResponse(responseCode = "404", description = "조직 정보를 찾을 수 없음")
+    })
+    SseEmitter subscribeRealtimeSummary(Authentication authentication);
+
+    @Operation(
+            summary = "대시보드 최근 24시간 시간대별 위험 건수 조회",
+            description = """
+                    **[ 최근 24시간 위험 시간대 집계 API ]**
+                    관리자 기준 소속 조직의 모든 구성원/모든 세션을 대상으로
+                    현재 시각 기준 최근 24시간의 시간대(1시간)별 `졸음 + 수면` 발생 건수를 조회합니다.
+                    집계 대상은 `ORGANIZATION` 모드 세션만 포함합니다.
+                    
+                    - 이벤트 시각 기준: `occurredAtApp`
+                    - 포함 이벤트: `DROWSY`, `SLEEP`
+                    - 진행 중 세션 이벤트 포함
+                    - 결과는 24개 버킷(0건 포함)으로 고정 반환
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "조회 성공",
+                    content = @Content(
+                            schema = @Schema(implementation = MonitoringHourlyRisk24hResponse.class),
+                            examples = @ExampleObject(
+                                    name = "hourlyRisk24hResponseExample",
+                                    summary = "최근 24시간 시간대별 위험 건수",
+                                    value = """
+                                            {
+                                              "rangeStart": "2026-04-18T13:00:00",
+                                              "rangeEnd": "2026-04-19T12:59:59",
+                                              "buckets": [
+                                                {
+                                                  "bucketStart": "2026-04-19T11:00:00",
+                                                  "bucketEnd": "2026-04-19T11:59:59",
+                                                  "totalRiskCount": 4
+                                                }
+                                              ]
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @ApiResponse(responseCode = "401", description = "인증 실패"),
+            @ApiResponse(responseCode = "403", description = "관리자 권한 없음")
+    })
+    MonitoringHourlyRisk24hResponse getHourlyRisk24h(Authentication authentication);
+
+    @Operation(
+            summary = "대시보드 최근 종료 세션 조회",
+            description = """
+                    **[ 최근 접속 세션 위젯 API ]**
+                    관리자 기준 소속 조직의 `ORGANIZATION` 모드 세션 중
+                    **현재 활성 세션(미종료)을 제외한 종료 세션만** 최신 순으로 조회합니다.
+                    
+                    - 정렬: `endedAtServer DESC`, `sessionId DESC`
+                    - 기본 조회 개수: `20`
+                    - 최대 조회 개수: `100` (요청값이 커도 서버에서 100으로 제한)
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "조회 성공",
+                    content = @Content(
+                            schema = @Schema(implementation = MonitoringRecentEndedSessionResponse.class),
+                            examples = @ExampleObject(
+                                    name = "recentEndedSessionsExample",
+                                    summary = "최근 종료 세션 응답 예시",
+                                    value = """
+                                            [
+                                              {
+                                                "sessionId": "123456789012345678",
+                                                "userId": "987654321012345678",
+                                                "userName": "홍길동",
+                                                "startedAtApp": "2026-04-18T08:20:00",
+                                                "endedAtApp": "2026-04-18T09:05:20",
+                                                "durationMinutes": 45,
+                                                "drowsyCount": 3,
+                                                "sleepCount": 1,
+                                                "totalRiskCount": 4
+                                              }
+                                            ]
+                                            """
+                            )
+                    )
+            ),
+            @ApiResponse(responseCode = "401", description = "인증 실패"),
+            @ApiResponse(responseCode = "403", description = "관리자 권한 없음"),
+            @ApiResponse(responseCode = "404", description = "조직 정보를 찾을 수 없음")
+    })
+    List<MonitoringRecentEndedSessionResponse> getRecentEndedSessions(
+            Authentication authentication,
+            @RequestParam
+            @Parameter(
+                    name = "limit",
+                    description = "조회 개수 (기본값: 20, 최대 100)",
+                    required = false,
+                    schema = @Schema(type = "integer", format = "int32", defaultValue = "20", example = "20")
+            )
+            int limit
+    );
+
+    @Operation(
+            summary = "대시보드 최근 알림 조회",
+            description = """
+                    **[ 실시간 알림 기록 API ]**
+                    관리자 기준 **소속 조직 전체 알림**을 **커서 기반**으로 조회합니다.
+                    알림은 `DROWSY` / `SLEEP` 이벤트 발생 시 자동 저장됩니다.
+                    
+                    - 정렬: `notificationId DESC`
+                    - `cursor` 미지정: 최신 페이지
+                    - `cursor` 지정: 해당 ID보다 작은 알림부터 조회
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "조회 성공",
+                    content = @Content(
+                            schema = @Schema(implementation = MonitoringNotificationPageResponse.class),
+                            examples = @ExampleObject(
+                                    name = "recentNotificationsExample",
+                                    summary = "최근 알림 응답 예시",
+                                    value = """
+                                            {
+                                              "items": [
+                                                {
+                                                  "notificationId": "123456789012345678",
+                                                  "userId": "223456789012345678",
+                                                  "targetUserId": "223456789012345678",
+                                                  "userName": "홍길동",
+                                                  "type": "DROWSY",
+                                                  "content": "홍길동 사용자에게 졸음 의심 알림이 감지되었습니다.",
+                                                  "occurredAt": "2026-04-19T13:20:30"
+                                                }
+                                              ],
+                                              "nextCursor": "123456789012345678",
+                                              "hasNext": true
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @ApiResponse(responseCode = "401", description = "인증 실패"),
+            @ApiResponse(responseCode = "403", description = "관리자 권한 없음")
+    })
+    MonitoringNotificationPageResponse getRecentNotifications(
+            Authentication authentication,
+            @RequestParam
+            @Parameter(
+                    name = "cursor",
+                    description = "다음 페이지 조회 시작 커서(notificationId). 없으면 최신부터 조회",
+                    required = false,
+                    schema = @Schema(type = "integer", format = "int64", example = "123456789012345678")
+            )
+            Long cursor,
+            @RequestParam
+            @Parameter(
+                    name = "limit",
+                    description = "조회 개수 (기본값: 50, 최대 200)",
+                    required = false,
+                    schema = @Schema(type = "integer", format = "int32", defaultValue = "50", example = "50")
+            )
+            int limit
+    );
+
+    @Operation(
             summary = "모니터링 시작",
             description = """
                     **[ 모니터링 시작 API ]**
@@ -77,7 +275,7 @@ public interface MonitoringControllerSpec {
                     
                     ### 📥 입력 (Input)
                     - `Authorization: Bearer {accessToken}` 헤더 (필수)
-                    - `mode`: 모니터링 모드 (`DRIVING` | `STUDY`)
+                    - `mode`: 모니터링 모드 (`ORGANIZATION` | `DRIVING` | `STUDY`)
                     - `startedAtApp`: 앱에서 측정한 시작 시각 (`yyyy-MM-dd'T'HH:mm:ss`)
                     
                     ### ⚠️ 동작 규칙

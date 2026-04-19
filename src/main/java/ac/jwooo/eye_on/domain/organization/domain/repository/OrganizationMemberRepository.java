@@ -13,4 +13,6 @@ public interface OrganizationMemberRepository extends JpaRepository<Organization
     List<OrganizationMember> findAllByOrganizationIdAndDeletedAtIsNullOrderByCreatedAtDesc(Long organizationId);
 
     Optional<OrganizationMember> findByIdAndOrganizationIdAndDeletedAtIsNull(Long id, Long organizationId);
+
+    Optional<OrganizationMember> findFirstByUserIdAndDeletedAtIsNull(Long userId);
 }

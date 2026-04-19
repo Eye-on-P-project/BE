@@ -16,10 +16,10 @@ public interface MonitoringEventLogRepository extends JpaRepository<MonitoringEv
     @Query(
             value = """
                     SELECT
-                        YEAR(mel.occurred_at_app) AS year,
-                        MONTH(mel.occurred_at_app) AS month,
-                        DAY(mel.occurred_at_app) AS day,
-                        HOUR(mel.occurred_at_app) AS hour,
+                        YEAR(mel.occurred_at_server) AS year,
+                        MONTH(mel.occurred_at_server) AS month,
+                        DAY(mel.occurred_at_server) AS day,
+                        HOUR(mel.occurred_at_server) AS hour,
                         COALESCE(SUM(CASE WHEN mel.event_type = 'DROWSY' THEN 1 ELSE 0 END), 0) AS drowsyCount,
                         COALESCE(SUM(CASE WHEN mel.event_type = 'SLEEP' THEN 1 ELSE 0 END), 0) AS sleepCount,
                         COUNT(*) AS totalRiskCount
@@ -34,9 +34,9 @@ public interface MonitoringEventLogRepository extends JpaRepository<MonitoringEv
                      AND m.deleted_at IS NULL
                     WHERE mel.deleted_at IS NULL
                       AND mel.event_type IN ('DROWSY', 'SLEEP')
-                      AND mel.occurred_at_app >= :rangeStart
-                      AND mel.occurred_at_app < :rangeEndExclusive
-                    GROUP BY YEAR(mel.occurred_at_app), MONTH(mel.occurred_at_app), DAY(mel.occurred_at_app), HOUR(mel.occurred_at_app)
+                      AND mel.occurred_at_server >= :rangeStart
+                      AND mel.occurred_at_server < :rangeEndExclusive
+                    GROUP BY YEAR(mel.occurred_at_server), MONTH(mel.occurred_at_server), DAY(mel.occurred_at_server), HOUR(mel.occurred_at_server)
                     ORDER BY year ASC, month ASC, day ASC, hour ASC
                     """,
             nativeQuery = true
@@ -64,8 +64,8 @@ public interface MonitoringEventLogRepository extends JpaRepository<MonitoringEv
                      AND m.deleted_at IS NULL
                     WHERE mel.deleted_at IS NULL
                       AND mel.event_type IN ('DROWSY', 'SLEEP')
-                      AND mel.occurred_at_app >= :rangeStart
-                      AND mel.occurred_at_app < :rangeEndExclusive
+                      AND mel.occurred_at_server >= :rangeStart
+                      AND mel.occurred_at_server < :rangeEndExclusive
                     GROUP BY m.organization_id
                     """,
             nativeQuery = true
@@ -93,8 +93,8 @@ public interface MonitoringEventLogRepository extends JpaRepository<MonitoringEv
                      AND m.deleted_at IS NULL
                     WHERE mel.deleted_at IS NULL
                       AND mel.event_type IN ('DROWSY', 'SLEEP')
-                      AND mel.occurred_at_app >= :rangeStart
-                      AND mel.occurred_at_app < :rangeEndExclusive
+                      AND mel.occurred_at_server >= :rangeStart
+                      AND mel.occurred_at_server < :rangeEndExclusive
                     GROUP BY m.organization_id, ms.user_id
                     """,
             nativeQuery = true
@@ -122,8 +122,8 @@ public interface MonitoringEventLogRepository extends JpaRepository<MonitoringEv
                      AND m.deleted_at IS NULL
                     WHERE mel.deleted_at IS NULL
                       AND mel.event_type IN ('DROWSY', 'SLEEP')
-                      AND mel.occurred_at_app >= :rangeStart
-                      AND mel.occurred_at_app < :rangeEndExclusive
+                      AND mel.occurred_at_server >= :rangeStart
+                      AND mel.occurred_at_server < :rangeEndExclusive
                     """,
             nativeQuery = true
     )
@@ -152,8 +152,8 @@ public interface MonitoringEventLogRepository extends JpaRepository<MonitoringEv
                      AND m.deleted_at IS NULL
                     WHERE mel.deleted_at IS NULL
                       AND mel.event_type IN ('DROWSY', 'SLEEP')
-                      AND mel.occurred_at_app >= :rangeStart
-                      AND mel.occurred_at_app < :rangeEndExclusive
+                      AND mel.occurred_at_server >= :rangeStart
+                      AND mel.occurred_at_server < :rangeEndExclusive
                     GROUP BY ms.user_id
                     """,
             nativeQuery = true

@@ -2,7 +2,6 @@ package ac.jwooo.eye_on.domain.organization.application.usecase;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -35,7 +34,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class GetOrganizationRiskStatsUseCase {
 
-    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private static final int HOURLY_MAX_DAYS = 31;
 
     private final OrganizationAccessService organizationAccessService;
@@ -128,7 +126,7 @@ public class GetOrganizationRiskStatsUseCase {
             dailyMap.put(stat.getStatDate(), DailyCount.from(stat));
         }
 
-        LocalDate today = LocalDate.now(KST);
+        LocalDate today = LocalDate.now();
         if (!today.isBefore(from) && !today.isAfter(to)) {
             dailyMap.put(today, fetchLiveDailyCount(organizationId, today));
         }
@@ -177,7 +175,7 @@ public class GetOrganizationRiskStatsUseCase {
     ) {
         Map<Long, TopMemberAccumulator> accumulatorMap = new HashMap<>();
 
-        LocalDate today = LocalDate.now(KST);
+        LocalDate today = LocalDate.now();
         LocalDate aggregatedTo = to.isBefore(today) ? to : today.minusDays(1);
         if (!aggregatedTo.isBefore(from)) {
             for (OrganizationTopRiskUserProjection projection : organizationUserDailyRiskStatRepository
@@ -317,7 +315,7 @@ public class GetOrganizationRiskStatsUseCase {
     }
 
     private LocalDateTime nowExclusive() {
-        return LocalDateTime.now(KST).withNano(0).plusSeconds(1);
+        return LocalDateTime.now().withNano(0).plusSeconds(1);
     }
 
     private LocalDateTime toHourStart(Integer year, Integer month, Integer day, Integer hour) {
@@ -356,7 +354,7 @@ public class GetOrganizationRiskStatsUseCase {
             throw new CustomException(ErrorCode.INVALID_INPUT, "from 날짜는 to 날짜보다 이후일 수 없습니다.");
         }
 
-        LocalDate today = LocalDate.now(KST);
+        LocalDate today = LocalDate.now();
         if (to.isAfter(today)) {
             throw new CustomException(ErrorCode.INVALID_INPUT, "미래 날짜는 조회할 수 없습니다.");
         }

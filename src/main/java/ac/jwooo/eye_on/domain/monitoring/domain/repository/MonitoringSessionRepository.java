@@ -15,6 +15,8 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
 
     boolean existsByUserIdAndEndedAtServerIsNullAndDeletedAtIsNull(Long userId);
 
+    List<MonitoringSession> findByUserIdAndEndedAtServerIsNullAndDeletedAtIsNull(Long userId);
+
     @Query(
             value = """
                     SELECT
@@ -132,10 +134,10 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
     @Query(
             value = """
                     SELECT
-                        YEAR(ms.started_at_app) AS year,
-                        MONTH(ms.started_at_app) AS month,
-                        DAY(ms.started_at_app) AS day,
-                        HOUR(ms.started_at_app) AS hour,
+                        YEAR(ms.started_at_server) AS year,
+                        MONTH(ms.started_at_server) AS month,
+                        DAY(ms.started_at_server) AS day,
+                        HOUR(ms.started_at_server) AS hour,
                         COUNT(ms.id) AS sessionCount
                     FROM monitoring_sessions ms
                     JOIN member m
@@ -144,9 +146,9 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
                      AND m.deleted_at IS NULL
                     WHERE ms.deleted_at IS NULL
                       AND ms.mode = 'ORGANIZATION'
-                      AND ms.started_at_app >= :rangeStart
-                      AND ms.started_at_app < :rangeEndExclusive
-                    GROUP BY YEAR(ms.started_at_app), MONTH(ms.started_at_app), DAY(ms.started_at_app), HOUR(ms.started_at_app)
+                      AND ms.started_at_server >= :rangeStart
+                      AND ms.started_at_server < :rangeEndExclusive
+                    GROUP BY YEAR(ms.started_at_server), MONTH(ms.started_at_server), DAY(ms.started_at_server), HOUR(ms.started_at_server)
                     ORDER BY year ASC, month ASC, day ASC, hour ASC
                     """,
             nativeQuery = true
@@ -168,8 +170,8 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
                      AND m.deleted_at IS NULL
                     WHERE ms.deleted_at IS NULL
                       AND ms.mode = 'ORGANIZATION'
-                      AND ms.started_at_app >= :rangeStart
-                      AND ms.started_at_app < :rangeEndExclusive
+                      AND ms.started_at_server >= :rangeStart
+                      AND ms.started_at_server < :rangeEndExclusive
                     GROUP BY m.organization_id
                     """,
             nativeQuery = true
@@ -191,8 +193,8 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
                      AND m.deleted_at IS NULL
                     WHERE ms.deleted_at IS NULL
                       AND ms.mode = 'ORGANIZATION'
-                      AND ms.started_at_app >= :rangeStart
-                      AND ms.started_at_app < :rangeEndExclusive
+                      AND ms.started_at_server >= :rangeStart
+                      AND ms.started_at_server < :rangeEndExclusive
                     """,
             nativeQuery = true
     )

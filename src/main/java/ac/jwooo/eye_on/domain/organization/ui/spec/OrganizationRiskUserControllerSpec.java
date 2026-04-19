@@ -100,7 +100,8 @@ public interface OrganizationRiskUserControllerSpec {
                       - `MONTH`: from 기준 1개월 단위 버킷
                       - `YEAR`: from 기준 1년 단위 버킷
                     - 집계 대상: `ORGANIZATION` 모드 세션만 포함
-                    - sessionCount 집계 기준: `monitoring_sessions.startedAtApp`
+                    - sessionCount 집계 기준: `monitoring_sessions.startedAtServer`
+                    - riskCount 집계 기준: `monitoring_event_logs.occurredAtServer`
                     - series 항목: `sessionCount`, `drowsyCount`, `sleepCount`, `totalRiskCount`
                     - top5Members: 기간 내 `drowsy + sleep` 기준 상위 5명
                     """,

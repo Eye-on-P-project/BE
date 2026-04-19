@@ -4,6 +4,7 @@ import ac.jwooo.eye_on.domain.auth.application.dto.request.LoginRequest;
 import ac.jwooo.eye_on.domain.auth.application.dto.request.SignupRequest;
 import ac.jwooo.eye_on.domain.auth.domain.entity.ClientType;
 import ac.jwooo.eye_on.domain.user.domain.entity.User;
+import ac.jwooo.eye_on.domain.user.domain.entity.UserRole;
 import ac.jwooo.eye_on.domain.user.domain.repository.OrganizationCodeRepository;
 import ac.jwooo.eye_on.domain.user.domain.repository.UserRepository;
 import ac.jwooo.eye_on.global.exception.CustomException;
@@ -36,29 +37,10 @@ public class AuthServiceImpl implements AuthService {
             throw new CustomException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
 
-        User newUser;
-        if (StringUtils.hasText(request.organizationCode())) {
-            String organizationCode = normalizeOrganizationCode(request.organizationCode());
-            if (!organizationCodeRepository.existsByCodeAndDeletedAtIsNull(organizationCode)) {
-                throw new CustomException(ErrorCode.ORGANIZATION_CODE_NOT_FOUND);
-            }
-
-            newUser = User.createAdmin(
-                    email,
-                    passwordEncoder.encode(request.password()),
-                    organizationCode
-            );
-        } else {
-            validateGeneralUserProfile(request);
-            newUser = User.createGeneralUser(
-                    email,
-                    passwordEncoder.encode(request.password()),
-                    request.name().trim(),
-                    request.nickname().trim(),
-                    request.age(),
-                    request.gender()
-            );
-        }
+        User newUser = switch (clientType) {
+            case WEB -> createAdminForWebSignup(request, email);
+            case APP -> createGeneralUserForAppSignup(request, email);
+        };
 
         User savedUser = userRepository.save(newUser);
         return issueTokens(savedUser, clientType);
@@ -72,6 +54,10 @@ public class AuthServiceImpl implements AuthService {
 
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             throw new CustomException(ErrorCode.INVALID_CREDENTIALS);
+        }
+
+        if (clientType == ClientType.WEB && user.getRole() != UserRole.ADMIN) {
+            throw new CustomException(ErrorCode.WEB_ADMIN_LOGIN_ONLY);
         }
 
         return issueTokens(user, clientType);
@@ -107,6 +93,10 @@ public class AuthServiceImpl implements AuthService {
 
         User user = userRepository.findByIdAndDeletedAtIsNull(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        if (clientType == ClientType.WEB && user.getRole() != UserRole.ADMIN) {
+            throw new CustomException(ErrorCode.WEB_ADMIN_LOGIN_ONLY);
+        }
 
         long oldRefreshTtl = jwtTokenProvider.remainingSeconds(claims);
         redisTokenStore.blacklistRefreshJti(refreshJti, oldRefreshTtl);
@@ -196,6 +186,39 @@ public class AuthServiceImpl implements AuthService {
                     "일반 사용자 회원가입에는 name, nickname, age, gender가 필요합니다."
             );
         }
+    }
+
+    private User createAdminForWebSignup(SignupRequest request, String email) {
+        if (!StringUtils.hasText(request.organizationCode())) {
+            throw new CustomException(ErrorCode.ORGANIZATION_CODE_REQUIRED);
+        }
+
+        String organizationCode = normalizeOrganizationCode(request.organizationCode());
+        if (!organizationCodeRepository.existsByCodeAndDeletedAtIsNull(organizationCode)) {
+            throw new CustomException(ErrorCode.ORGANIZATION_CODE_NOT_FOUND);
+        }
+
+        if (userRepository.existsByOrganizationCodeAndRoleAndDeletedAtIsNull(organizationCode, UserRole.ADMIN)) {
+            throw new CustomException(ErrorCode.ORGANIZATION_ADMIN_ALREADY_EXISTS);
+        }
+
+        return User.createAdmin(
+                email,
+                passwordEncoder.encode(request.password()),
+                organizationCode
+        );
+    }
+
+    private User createGeneralUserForAppSignup(SignupRequest request, String email) {
+        validateGeneralUserProfile(request);
+        return User.createGeneralUser(
+                email,
+                passwordEncoder.encode(request.password()),
+                request.name().trim(),
+                request.nickname().trim(),
+                request.age(),
+                request.gender()
+        );
     }
 
     private Long parseUserId(Claims claims) {

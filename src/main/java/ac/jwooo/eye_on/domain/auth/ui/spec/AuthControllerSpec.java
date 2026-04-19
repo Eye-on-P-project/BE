@@ -35,11 +35,11 @@ public interface AuthControllerSpec {
                     ### 📥 **입력 (Input)**
                     - `email` (필수): 사용자 이메일 (예: user@example.com)
                     - `password` (필수): 4~72자의 비밀번호
-                    - `organizationCode` (선택): 소속 기관 코드 (예: ORG001)
-                    - `name` (선택): 사용자 본명 (예: 홍길동)
-                    - `nickname` (선택): 서비스에서 사용할 닉네임 (예: 길동이)
-                    - `age` (선택): 1~120 사이의 나이
-                    - `gender` (선택): 성별 (MALE, FEMALE, 등)
+                    - `organizationCode` (조건부): **WEB 가입 시 필수** (예: ORG001), **APP 가입 시 무시됨**
+                    - `name` (조건부): APP 가입 시 필수
+                    - `nickname` (조건부): APP 가입 시 필수
+                    - `age` (조건부): APP 가입 시 필수 (1~120)
+                    - `gender` (조건부): APP 가입 시 필수 (MALE, FEMALE)
                     
                     ### 📤 **출력 (Output)**
                     - `userId`: 생성된 사용자의 고유 ID (문자열 형태의 TSID)
@@ -48,8 +48,9 @@ public interface AuthControllerSpec {
                     - `role`: 사용자 권한 (ROLE_USER 등)
                     
                     **[ 클라이언트 타입에 따른 처리 ]**
-                    - **WEB 클라이언트 (`X-Client-Type: WEB`)**: refreshToken이 응답 바디가 아닌 `HttpOnly` 쿠키로 설정됩니다.
-                    - **APP 클라이언트 (`X-Client-Type: APP` 또는 미입력)**: refreshToken이 응답 바디에 포함됩니다.
+                    - **WEB 클라이언트 (`X-Client-Type: WEB`)**: 관리자 계정만 가입 가능, refreshToken은 `HttpOnly` 쿠키로 설정됩니다.
+                    - **APP 클라이언트 (`X-Client-Type: APP` 또는 미입력)**: 일반 사용자로만 가입되며 organizationCode는 사용되지 않습니다.
+                    - **조직 관리자 정책**: 조직 코드당 관리자 계정은 1개만 생성할 수 있습니다.
                     """
     )
     @ApiResponses({
@@ -129,7 +130,7 @@ public interface AuthControllerSpec {
                     - `role`: 사용자 권한
                     
                     **[ 클라이언트 타입에 따른 처리 ]**
-                    - **WEB 클라이언트**: refreshToken이 `HttpOnly` 쿠키에 담겨 반환됩니다. (보안 강화)
+                    - **WEB 클라이언트**: 조직 관리자(ADMIN) 계정만 로그인 가능하며, refreshToken이 `HttpOnly` 쿠키에 담겨 반환됩니다.
                     - **APP 클라이언트**: refreshToken이 응답 바디의 JSON에 포함됩니다.
                     """
     )

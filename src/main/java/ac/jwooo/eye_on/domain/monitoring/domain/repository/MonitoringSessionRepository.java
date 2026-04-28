@@ -80,7 +80,11 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
                         COUNT(ms.id) AS totalSessionCount,
                         COALESCE(SUM(ms.drowsy_count), 0) AS drowsyCount,
                         COALESCE(SUM(ms.sleep_count), 0) AS sleepCount,
-                        COALESCE(SUM(ms.drowsy_count + ms.sleep_count), 0) AS totalRiskCount
+                        COALESCE(SUM(ms.drowsy_count + ms.sleep_count), 0) AS totalRiskCount,
+                        CASE
+                            WHEN active_users.user_id IS NULL THEN 0
+                            ELSE 1
+                        END AS isMonitoringActive
                     FROM member m
                     JOIN users u
                       ON u.id = m.user_id
@@ -89,9 +93,17 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
                       ON ms.user_id = m.user_id
                      AND ms.deleted_at IS NULL
                      AND ms.mode = 'ORGANIZATION'
+                    LEFT JOIN (
+                        SELECT DISTINCT active_ms.user_id
+                        FROM monitoring_sessions active_ms
+                        WHERE active_ms.deleted_at IS NULL
+                          AND active_ms.mode = 'ORGANIZATION'
+                          AND active_ms.ended_at_server IS NULL
+                    ) active_users
+                      ON active_users.user_id = m.user_id
                     WHERE m.organization_id = :organizationId
                       AND m.deleted_at IS NULL
-                    GROUP BY m.user_id, u.email, u.name, u.nickname
+                    GROUP BY m.user_id, u.email, u.name, u.nickname, active_users.user_id
                     ORDER BY totalRiskCount DESC, sleepCount DESC, drowsyCount DESC, totalSessionCount DESC, m.user_id ASC
                     """,
             nativeQuery = true

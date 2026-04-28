@@ -12,7 +12,8 @@ public record OrganizationRiskUserResponse(
         long totalSessionCount,
         long drowsyCount,
         long sleepCount,
-        long totalRiskCount
+        long totalRiskCount,
+        boolean isMonitoringActive
 ) {
     public static OrganizationRiskUserResponse from(OrganizationRiskUserProjection projection) {
         return new OrganizationRiskUserResponse(
@@ -23,11 +24,16 @@ public record OrganizationRiskUserResponse(
                 nullSafe(projection.getTotalSessionCount()),
                 nullSafe(projection.getDrowsyCount()),
                 nullSafe(projection.getSleepCount()),
-                nullSafe(projection.getTotalRiskCount())
+                nullSafe(projection.getTotalRiskCount()),
+                nullSafeBoolean(projection.getIsMonitoringActive())
         );
     }
 
     private static long nullSafe(Long value) {
         return value == null ? 0L : value;
+    }
+
+    private static boolean nullSafeBoolean(Integer value) {
+        return value != null && value != 0;
     }
 }

@@ -17,4 +17,6 @@ public interface OrganizationRiskUserProjection {
     Long getSleepCount();
 
     Long getTotalRiskCount();
+
+    Integer getIsMonitoringActive();
 }

@@ -109,7 +109,7 @@ public interface MonitoringControllerSpec {
                     현재 시각 기준 최근 24시간의 시간대(1시간)별 `졸음 + 수면` 발생 건수를 조회합니다.
                     집계 대상은 `ORGANIZATION` 모드 세션만 포함합니다.
                     
-                    - 이벤트 시각 기준: `occurredAtServer`
+                    - 이벤트 시각 기준: `monitoring_event_logs.created_at`
                     - 포함 이벤트: `DROWSY`, `SLEEP`
                     - 진행 중 세션 이벤트 포함
                     - 결과는 24개 버킷(0건 포함)으로 고정 반환

@@ -22,7 +22,9 @@ import lombok.NoArgsConstructor;
         name = "monitoring_event_logs",
         indexes = {
                 @Index(name = "idx_mel_session_latest", columnList = "session_id,deleted_at,occurred_at_app,id,event_type"),
-                @Index(name = "idx_mel_range_event", columnList = "occurred_at_app,event_type,deleted_at,session_id")
+                @Index(name = "idx_mel_range_event", columnList = "occurred_at_app,event_type,deleted_at,session_id"),
+                @Index(name = "idx_mel_session_latest_created", columnList = "session_id,deleted_at,created_at,id,event_type"),
+                @Index(name = "idx_mel_range_event_created", columnList = "created_at,event_type,deleted_at,session_id")
         }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

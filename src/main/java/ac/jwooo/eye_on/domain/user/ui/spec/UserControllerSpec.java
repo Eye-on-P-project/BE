@@ -3,6 +3,7 @@ package ac.jwooo.eye_on.domain.user.ui.spec;
 import java.util.List;
 import java.util.Map;
 
+import ac.jwooo.eye_on.domain.user.application.dto.request.ChangePasswordRequest;
 import ac.jwooo.eye_on.domain.user.application.dto.request.CreateOrganizationRecordRequest;
 import ac.jwooo.eye_on.domain.user.application.dto.response.MeResponse;
 import ac.jwooo.eye_on.domain.user.application.dto.response.OrganizationRecordResponse;
@@ -69,6 +70,63 @@ public interface UserControllerSpec {
             @ApiResponse(responseCode = "401", description = "인증 헤더가 유효하지 않거나 만료됨")
     })
     MeResponse me(Authentication authentication);
+
+    @Operation(
+            summary = "내 비밀번호 변경",
+            description = """
+                    **[ 내 비밀번호 변경 API ]**
+                    로그인한 사용자의 비밀번호를 변경합니다.
+                    
+                    ### 📥 **입력 (Input)**
+                    - `Authorization` 헤더: `Bearer <accessToken>` (필수)
+                    - `currentPassword` (필수): 현재 비밀번호
+                    - `newPassword` (필수): 새 비밀번호 (4~72자)
+                    - `organizationCode` (필수): 사용자 소속 조직 코드 (대소문자 구분)
+                    
+                    ### 📤 **출력 (Output)**
+                    - 성공 시 `{ "success": true }`를 반환합니다.
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "비밀번호 변경 성공",
+                    content = @Content(
+                            schema = @Schema(type = "object"),
+                            examples = @ExampleObject(
+                                    name = "changePasswordSuccessExample",
+                                    summary = "비밀번호 변경 성공 응답",
+                                    value = "{\"success\": true}"
+                            )
+                    )
+            ),
+            @ApiResponse(responseCode = "400", description = "요청 형식 오류, 현재 비밀번호 불일치, 또는 새 비밀번호가 기존 비밀번호와 동일함"),
+            @ApiResponse(responseCode = "401", description = "인증 실패"),
+            @ApiResponse(responseCode = "403", description = "조직 코드 불일치")
+    })
+    Map<String, Object> changePassword(
+            Authentication authentication,
+            @RequestBody(
+                    required = true,
+                    description = "현재/새 비밀번호를 포함한 변경 요청",
+                    content = @Content(
+                            schema = @Schema(implementation = ChangePasswordRequest.class),
+                            examples = @ExampleObject(
+                                    name = "changePasswordRequestExample",
+                                    summary = "비밀번호 변경 요청 예시",
+                                    value = """
+                                            {
+                                              "currentPassword": "password123",
+                                              "newPassword": "newPassword456",
+                                              "organizationCode": "ORG001"
+                                            }
+                                            """
+                            )
+                    )
+            )
+            @Valid ChangePasswordRequest request
+    );
 
     @Operation(
             summary = "개발용 조직 레코드 생성",

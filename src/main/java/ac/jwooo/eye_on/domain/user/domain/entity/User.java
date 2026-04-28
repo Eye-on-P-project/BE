@@ -100,5 +100,8 @@ public class User extends BaseEntity {
     private static String normalizeEmail(String email) {
         return email == null ? null : email.trim().toLowerCase();
     }
-}
 
+    public void changePassword(String encodedPassword) {
+        this.passwordHash = encodedPassword;
+    }
+}

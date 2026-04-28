@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +25,12 @@ public class UserPasswordServiceImpl implements UserPasswordService {
         User user = userRepository.findByIdAndDeletedAtIsNull(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
+        String userOrganizationCode = normalizeOrganizationCode(user.getOrganizationCode());
+        String requestOrganizationCode = normalizeOrganizationCode(request.organizationCode());
+        if (!StringUtils.hasText(userOrganizationCode) || !userOrganizationCode.equals(requestOrganizationCode)) {
+            throw new CustomException(ErrorCode.ORGANIZATION_CODE_MISMATCH);
+        }
+
         if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
             throw new CustomException(ErrorCode.CURRENT_PASSWORD_MISMATCH);
         }
@@ -33,5 +40,9 @@ public class UserPasswordServiceImpl implements UserPasswordService {
         }
 
         user.changePassword(passwordEncoder.encode(request.newPassword()));
+    }
+
+    private String normalizeOrganizationCode(String organizationCode) {
+        return organizationCode == null ? null : organizationCode.trim();
     }
 }

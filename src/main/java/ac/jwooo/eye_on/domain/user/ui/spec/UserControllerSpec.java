@@ -81,6 +81,7 @@ public interface UserControllerSpec {
                     - `Authorization` 헤더: `Bearer <accessToken>` (필수)
                     - `currentPassword` (필수): 현재 비밀번호
                     - `newPassword` (필수): 새 비밀번호 (4~72자)
+                    - `organizationCode` (필수): 사용자 소속 조직 코드 (대소문자 구분)
                     
                     ### 📤 **출력 (Output)**
                     - 성공 시 `{ "success": true }`를 반환합니다.
@@ -100,8 +101,9 @@ public interface UserControllerSpec {
                             )
                     )
             ),
-            @ApiResponse(responseCode = "400", description = "요청 형식 오류 또는 새 비밀번호가 기존 비밀번호와 동일함"),
-            @ApiResponse(responseCode = "401", description = "인증 실패 또는 현재 비밀번호 불일치")
+            @ApiResponse(responseCode = "400", description = "요청 형식 오류, 현재 비밀번호 불일치, 또는 새 비밀번호가 기존 비밀번호와 동일함"),
+            @ApiResponse(responseCode = "401", description = "인증 실패"),
+            @ApiResponse(responseCode = "403", description = "조직 코드 불일치")
     })
     Map<String, Object> changePassword(
             Authentication authentication,
@@ -116,7 +118,8 @@ public interface UserControllerSpec {
                                     value = """
                                             {
                                               "currentPassword": "password123",
-                                              "newPassword": "newPassword456"
+                                              "newPassword": "newPassword456",
+                                              "organizationCode": "ORG001"
                                             }
                                             """
                             )

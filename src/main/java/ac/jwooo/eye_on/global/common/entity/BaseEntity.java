@@ -1,7 +1,6 @@
 package ac.jwooo.eye_on.global.common.entity;
 
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.EntityListeners;
@@ -16,7 +15,6 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 @MappedSuperclass
 @EntityListeners(AuditingEntityListener.class)
 public abstract class BaseEntity {
-    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -30,6 +28,7 @@ public abstract class BaseEntity {
     private LocalDateTime deletedAt;
 
     public void markDeleted() {
-        this.deletedAt = LocalDateTime.now(KST).withNano(0);
+        this.deletedAt = LocalDateTime.now();
     }
 }
+

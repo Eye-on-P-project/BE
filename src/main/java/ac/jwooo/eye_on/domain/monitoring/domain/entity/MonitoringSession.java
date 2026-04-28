@@ -42,16 +42,16 @@ public class MonitoringSession extends BaseEntity {
     @Column(nullable = false, length = 20)
     private MonitoringMode mode;
 
-    @Column(name = "started_at_app", nullable = false)
+    @Column(name = "started_at_app", nullable = false, columnDefinition = "datetime(6)")
     private LocalDateTime startedAtApp;
 
-    @Column(name = "started_at_server", nullable = false)
+    @Column(name = "started_at_server", nullable = false, columnDefinition = "datetime(6)")
     private LocalDateTime startedAtServer;
 
-    @Column(name = "ended_at_app")
+    @Column(name = "ended_at_app", columnDefinition = "datetime(6)")
     private LocalDateTime endedAtApp;
 
-    @Column(name = "ended_at_server")
+    @Column(name = "ended_at_server", columnDefinition = "datetime(6)")
     private LocalDateTime endedAtServer;
 
     @Column(name = "duration_minutes")

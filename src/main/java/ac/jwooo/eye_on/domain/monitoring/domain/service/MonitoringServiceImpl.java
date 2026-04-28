@@ -130,7 +130,7 @@ public class MonitoringServiceImpl implements MonitoringService {
             throw new CustomException(ErrorCode.INVALID_MONITORING_TIME_RANGE);
         }
 
-        monitoringEventLogRepository.findTopBySessionIdAndDeletedAtIsNullOrderByOccurredAtAppDescIdDesc(sessionId)
+        monitoringEventLogRepository.findTopBySessionIdAndDeletedAtIsNullOrderByCreatedAtDescIdDesc(sessionId)
                 .ifPresent(lastEvent -> {
                     if (occurredAtApp.isBefore(lastEvent.getOccurredAtApp())) {
                         throw new CustomException(
@@ -310,7 +310,7 @@ public class MonitoringServiceImpl implements MonitoringService {
                     sourceUserName,
                     notificationType,
                     buildNotificationContent(sourceUserName, notificationType),
-                    eventResponse.occurredAtServer()
+                    eventResponse.occurredAtApp()
             );
         }
         if (!isRiskEvent(eventResponse.eventType())) {
@@ -328,7 +328,7 @@ public class MonitoringServiceImpl implements MonitoringService {
         return MonitoringNotificationResponse.fromEntity(
                 savedNotification,
                 sourceUserName,
-                eventResponse.occurredAtServer()
+                eventResponse.occurredAtApp()
         );
     }
 

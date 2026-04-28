@@ -11,15 +11,15 @@ import org.springframework.data.repository.query.Param;
 
 public interface MonitoringEventLogRepository extends JpaRepository<MonitoringEventLog, Long> {
 
-    Optional<MonitoringEventLog> findTopBySessionIdAndDeletedAtIsNullOrderByOccurredAtAppDescIdDesc(Long sessionId);
+    Optional<MonitoringEventLog> findTopBySessionIdAndDeletedAtIsNullOrderByCreatedAtDescIdDesc(Long sessionId);
 
     @Query(
             value = """
                     SELECT
-                        YEAR(mel.occurred_at_server) AS year,
-                        MONTH(mel.occurred_at_server) AS month,
-                        DAY(mel.occurred_at_server) AS day,
-                        HOUR(mel.occurred_at_server) AS hour,
+                        YEAR(mel.created_at) AS year,
+                        MONTH(mel.created_at) AS month,
+                        DAY(mel.created_at) AS day,
+                        HOUR(mel.created_at) AS hour,
                         COALESCE(SUM(CASE WHEN mel.event_type = 'DROWSY' THEN 1 ELSE 0 END), 0) AS drowsyCount,
                         COALESCE(SUM(CASE WHEN mel.event_type = 'SLEEP' THEN 1 ELSE 0 END), 0) AS sleepCount,
                         COUNT(*) AS totalRiskCount
@@ -34,9 +34,9 @@ public interface MonitoringEventLogRepository extends JpaRepository<MonitoringEv
                      AND m.deleted_at IS NULL
                     WHERE mel.deleted_at IS NULL
                       AND mel.event_type IN ('DROWSY', 'SLEEP')
-                      AND mel.occurred_at_server >= :rangeStart
-                      AND mel.occurred_at_server < :rangeEndExclusive
-                    GROUP BY YEAR(mel.occurred_at_server), MONTH(mel.occurred_at_server), DAY(mel.occurred_at_server), HOUR(mel.occurred_at_server)
+                      AND mel.created_at >= :rangeStart
+                      AND mel.created_at < :rangeEndExclusive
+                    GROUP BY YEAR(mel.created_at), MONTH(mel.created_at), DAY(mel.created_at), HOUR(mel.created_at)
                     ORDER BY year ASC, month ASC, day ASC, hour ASC
                     """,
             nativeQuery = true
@@ -64,8 +64,8 @@ public interface MonitoringEventLogRepository extends JpaRepository<MonitoringEv
                      AND m.deleted_at IS NULL
                     WHERE mel.deleted_at IS NULL
                       AND mel.event_type IN ('DROWSY', 'SLEEP')
-                      AND mel.occurred_at_server >= :rangeStart
-                      AND mel.occurred_at_server < :rangeEndExclusive
+                      AND mel.created_at >= :rangeStart
+                      AND mel.created_at < :rangeEndExclusive
                     GROUP BY m.organization_id
                     """,
             nativeQuery = true
@@ -93,8 +93,8 @@ public interface MonitoringEventLogRepository extends JpaRepository<MonitoringEv
                      AND m.deleted_at IS NULL
                     WHERE mel.deleted_at IS NULL
                       AND mel.event_type IN ('DROWSY', 'SLEEP')
-                      AND mel.occurred_at_server >= :rangeStart
-                      AND mel.occurred_at_server < :rangeEndExclusive
+                      AND mel.created_at >= :rangeStart
+                      AND mel.created_at < :rangeEndExclusive
                     GROUP BY m.organization_id, ms.user_id
                     """,
             nativeQuery = true
@@ -122,8 +122,8 @@ public interface MonitoringEventLogRepository extends JpaRepository<MonitoringEv
                      AND m.deleted_at IS NULL
                     WHERE mel.deleted_at IS NULL
                       AND mel.event_type IN ('DROWSY', 'SLEEP')
-                      AND mel.occurred_at_server >= :rangeStart
-                      AND mel.occurred_at_server < :rangeEndExclusive
+                      AND mel.created_at >= :rangeStart
+                      AND mel.created_at < :rangeEndExclusive
                     """,
             nativeQuery = true
     )
@@ -152,8 +152,8 @@ public interface MonitoringEventLogRepository extends JpaRepository<MonitoringEv
                      AND m.deleted_at IS NULL
                     WHERE mel.deleted_at IS NULL
                       AND mel.event_type IN ('DROWSY', 'SLEEP')
-                      AND mel.occurred_at_server >= :rangeStart
-                      AND mel.occurred_at_server < :rangeEndExclusive
+                      AND mel.created_at >= :rangeStart
+                      AND mel.created_at < :rangeEndExclusive
                     GROUP BY ms.user_id
                     """,
             nativeQuery = true

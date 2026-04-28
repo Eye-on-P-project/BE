@@ -54,7 +54,7 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
                                 mel.event_type,
                                 ROW_NUMBER() OVER (
                                     PARTITION BY mel.session_id
-                                    ORDER BY mel.occurred_at_app DESC, mel.id DESC
+                                    ORDER BY mel.created_at DESC, mel.id DESC
                                 ) AS rn
                             FROM monitoring_event_logs mel
                             WHERE mel.deleted_at IS NULL
@@ -146,10 +146,10 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
     @Query(
             value = """
                     SELECT
-                        YEAR(ms.started_at_server) AS year,
-                        MONTH(ms.started_at_server) AS month,
-                        DAY(ms.started_at_server) AS day,
-                        HOUR(ms.started_at_server) AS hour,
+                        YEAR(ms.created_at) AS year,
+                        MONTH(ms.created_at) AS month,
+                        DAY(ms.created_at) AS day,
+                        HOUR(ms.created_at) AS hour,
                         COUNT(ms.id) AS sessionCount
                     FROM monitoring_sessions ms
                     JOIN member m
@@ -158,9 +158,9 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
                      AND m.deleted_at IS NULL
                     WHERE ms.deleted_at IS NULL
                       AND ms.mode = 'ORGANIZATION'
-                      AND ms.started_at_server >= :rangeStart
-                      AND ms.started_at_server < :rangeEndExclusive
-                    GROUP BY YEAR(ms.started_at_server), MONTH(ms.started_at_server), DAY(ms.started_at_server), HOUR(ms.started_at_server)
+                      AND ms.created_at >= :rangeStart
+                      AND ms.created_at < :rangeEndExclusive
+                    GROUP BY YEAR(ms.created_at), MONTH(ms.created_at), DAY(ms.created_at), HOUR(ms.created_at)
                     ORDER BY year ASC, month ASC, day ASC, hour ASC
                     """,
             nativeQuery = true
@@ -182,8 +182,8 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
                      AND m.deleted_at IS NULL
                     WHERE ms.deleted_at IS NULL
                       AND ms.mode = 'ORGANIZATION'
-                      AND ms.started_at_server >= :rangeStart
-                      AND ms.started_at_server < :rangeEndExclusive
+                      AND ms.created_at >= :rangeStart
+                      AND ms.created_at < :rangeEndExclusive
                     GROUP BY m.organization_id
                     """,
             nativeQuery = true
@@ -205,8 +205,8 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
                      AND m.deleted_at IS NULL
                     WHERE ms.deleted_at IS NULL
                       AND ms.mode = 'ORGANIZATION'
-                      AND ms.started_at_server >= :rangeStart
-                      AND ms.started_at_server < :rangeEndExclusive
+                      AND ms.created_at >= :rangeStart
+                      AND ms.created_at < :rangeEndExclusive
                     """,
             nativeQuery = true
     )

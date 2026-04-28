@@ -25,6 +25,7 @@ import lombok.NoArgsConstructor;
                 @Index(name = "idx_ms_user_started", columnList = "user_id,started_at_server,deleted_at"),
                 @Index(name = "idx_ms_started_app", columnList = "started_at_app,deleted_at,user_id"),
                 @Index(name = "idx_ms_mode_started_app", columnList = "mode,started_at_app,deleted_at,user_id"),
+                @Index(name = "idx_ms_mode_created", columnList = "mode,created_at,deleted_at,user_id"),
                 @Index(name = "idx_ms_mode_active", columnList = "mode,ended_at_server,deleted_at,user_id")
         }
 )

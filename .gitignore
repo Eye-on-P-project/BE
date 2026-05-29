@@ -39,3 +39,6 @@ out/
 .env
 
 .DS_Store
+
+# documents
+/docs

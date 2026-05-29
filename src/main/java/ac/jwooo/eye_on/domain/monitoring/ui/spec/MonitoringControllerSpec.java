@@ -109,7 +109,7 @@ public interface MonitoringControllerSpec {
                     현재 시각 기준 최근 24시간의 시간대(1시간)별 `졸음 + 수면` 발생 건수를 조회합니다.
                     집계 대상은 `ORGANIZATION` 모드 세션만 포함합니다.
                     
-                    - 이벤트 시각 기준: `occurredAtApp`
+                    - 이벤트 시각 기준: `occurredAtServer`
                     - 포함 이벤트: `DROWSY`, `SLEEP`
                     - 진행 중 세션 이벤트 포함
                     - 결과는 24개 버킷(0건 포함)으로 고정 반환
@@ -280,7 +280,7 @@ public interface MonitoringControllerSpec {
                     
                     ### ⚠️ 동작 규칙
                     - 사용자별로 **동시에 1개의 활성 세션만 허용**됩니다.
-                    - 이미 종료되지 않은 세션이 있으면 `409 MONITORING_SESSION_ALREADY_ACTIVE`를 반환합니다.
+                    - 이미 종료되지 않은 세션이 있으면 서버가 해당 세션을 자동 종료한 뒤 새 세션을 시작합니다.
                     
                     ### 📤 출력 (Output)
                     - `sessionId`: 생성된 모니터링 세션 PK

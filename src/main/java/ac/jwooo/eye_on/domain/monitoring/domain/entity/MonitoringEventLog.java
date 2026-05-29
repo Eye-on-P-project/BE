@@ -39,10 +39,10 @@ public class MonitoringEventLog extends BaseEntity {
     @Column(name = "event_type", nullable = false, length = 20)
     private MonitoringEventType eventType;
 
-    @Column(name = "occurred_at_app", nullable = false)
+    @Column(name = "occurred_at_app", nullable = false, columnDefinition = "datetime(6)")
     private LocalDateTime occurredAtApp;
 
-    @Column(name = "occurred_at_server", nullable = false)
+    @Column(name = "occurred_at_server", nullable = false, columnDefinition = "datetime(6)")
     private LocalDateTime occurredAtServer;
 
     @Builder(access = AccessLevel.PRIVATE)

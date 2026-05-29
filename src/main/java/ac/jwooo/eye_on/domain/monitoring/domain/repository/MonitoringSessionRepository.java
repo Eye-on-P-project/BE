@@ -15,6 +15,8 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
 
     boolean existsByUserIdAndEndedAtServerIsNullAndDeletedAtIsNull(Long userId);
 
+    List<MonitoringSession> findByUserIdAndEndedAtServerIsNullAndDeletedAtIsNull(Long userId);
+
     @Query(
             value = """
                     SELECT
@@ -78,7 +80,11 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
                         COUNT(ms.id) AS totalSessionCount,
                         COALESCE(SUM(ms.drowsy_count), 0) AS drowsyCount,
                         COALESCE(SUM(ms.sleep_count), 0) AS sleepCount,
-                        COALESCE(SUM(ms.drowsy_count + ms.sleep_count), 0) AS totalRiskCount
+                        COALESCE(SUM(ms.drowsy_count + ms.sleep_count), 0) AS totalRiskCount,
+                        CASE
+                            WHEN active_users.user_id IS NULL THEN 0
+                            ELSE 1
+                        END AS isMonitoringActive
                     FROM member m
                     JOIN users u
                       ON u.id = m.user_id
@@ -87,9 +93,17 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
                       ON ms.user_id = m.user_id
                      AND ms.deleted_at IS NULL
                      AND ms.mode = 'ORGANIZATION'
+                    LEFT JOIN (
+                        SELECT DISTINCT active_ms.user_id
+                        FROM monitoring_sessions active_ms
+                        WHERE active_ms.deleted_at IS NULL
+                          AND active_ms.mode = 'ORGANIZATION'
+                          AND active_ms.ended_at_server IS NULL
+                    ) active_users
+                      ON active_users.user_id = m.user_id
                     WHERE m.organization_id = :organizationId
                       AND m.deleted_at IS NULL
-                    GROUP BY m.user_id, u.email, u.name, u.nickname
+                    GROUP BY m.user_id, u.email, u.name, u.nickname, active_users.user_id
                     ORDER BY totalRiskCount DESC, sleepCount DESC, drowsyCount DESC, totalSessionCount DESC, m.user_id ASC
                     """,
             nativeQuery = true
@@ -132,10 +146,10 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
     @Query(
             value = """
                     SELECT
-                        YEAR(ms.started_at_app) AS year,
-                        MONTH(ms.started_at_app) AS month,
-                        DAY(ms.started_at_app) AS day,
-                        HOUR(ms.started_at_app) AS hour,
+                        YEAR(ms.started_at_server) AS year,
+                        MONTH(ms.started_at_server) AS month,
+                        DAY(ms.started_at_server) AS day,
+                        HOUR(ms.started_at_server) AS hour,
                         COUNT(ms.id) AS sessionCount
                     FROM monitoring_sessions ms
                     JOIN member m
@@ -144,9 +158,9 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
                      AND m.deleted_at IS NULL
                     WHERE ms.deleted_at IS NULL
                       AND ms.mode = 'ORGANIZATION'
-                      AND ms.started_at_app >= :rangeStart
-                      AND ms.started_at_app < :rangeEndExclusive
-                    GROUP BY YEAR(ms.started_at_app), MONTH(ms.started_at_app), DAY(ms.started_at_app), HOUR(ms.started_at_app)
+                      AND ms.started_at_server >= :rangeStart
+                      AND ms.started_at_server < :rangeEndExclusive
+                    GROUP BY YEAR(ms.started_at_server), MONTH(ms.started_at_server), DAY(ms.started_at_server), HOUR(ms.started_at_server)
                     ORDER BY year ASC, month ASC, day ASC, hour ASC
                     """,
             nativeQuery = true
@@ -168,8 +182,8 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
                      AND m.deleted_at IS NULL
                     WHERE ms.deleted_at IS NULL
                       AND ms.mode = 'ORGANIZATION'
-                      AND ms.started_at_app >= :rangeStart
-                      AND ms.started_at_app < :rangeEndExclusive
+                      AND ms.started_at_server >= :rangeStart
+                      AND ms.started_at_server < :rangeEndExclusive
                     GROUP BY m.organization_id
                     """,
             nativeQuery = true
@@ -191,8 +205,8 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
                      AND m.deleted_at IS NULL
                     WHERE ms.deleted_at IS NULL
                       AND ms.mode = 'ORGANIZATION'
-                      AND ms.started_at_app >= :rangeStart
-                      AND ms.started_at_app < :rangeEndExclusive
+                      AND ms.started_at_server >= :rangeStart
+                      AND ms.started_at_server < :rangeEndExclusive
                     """,
             nativeQuery = true
     )

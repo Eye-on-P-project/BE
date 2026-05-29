@@ -39,7 +39,7 @@ class AuthControllerWebCookieTest {
 
     @BeforeEach
     void setUp() {
-        SecurityProperties securityProperties = new SecurityProperties("refreshToken", false, "Lax", "/", "");
+        SecurityProperties securityProperties = new SecurityProperties("refreshToken", false, "Lax", "/", "", false, false);
         JwtProperties jwtProperties = new JwtProperties("test-secret-key-test-secret-key", 900, 1209600);
         AuthController authController = new AuthController(authService, securityProperties, jwtProperties);
         mockMvc = MockMvcBuilders.standaloneSetup(authController).build();

@@ -40,10 +40,6 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
                         COALESCE(SUM(CASE WHEN latest_event.event_type = 'SLEEP' THEN 1 ELSE 0 END), 0)
                             AS sleepWarningSessionCount
                     FROM monitoring_sessions ms
-                    JOIN member m
-                      ON m.user_id = ms.user_id
-                     AND m.organization_id = :organizationId
-                     AND m.deleted_at IS NULL
                     LEFT JOIN (
                         SELECT
                             ranked.session_id,
@@ -65,6 +61,7 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
                     WHERE ms.ended_at_server IS NULL
                       AND ms.deleted_at IS NULL
                       AND ms.mode = 'ORGANIZATION'
+                      AND ms.organization_id = :organizationId
                     """,
             nativeQuery = true
     )
@@ -91,6 +88,7 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
                      AND u.deleted_at IS NULL
                     LEFT JOIN monitoring_sessions ms
                       ON ms.user_id = m.user_id
+                     AND ms.organization_id = m.organization_id
                      AND ms.deleted_at IS NULL
                      AND ms.mode = 'ORGANIZATION'
                     LEFT JOIN (
@@ -99,6 +97,7 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
                         WHERE active_ms.deleted_at IS NULL
                           AND active_ms.mode = 'ORGANIZATION'
                           AND active_ms.ended_at_server IS NULL
+                          AND active_ms.organization_id = :organizationId
                     ) active_users
                       ON active_users.user_id = m.user_id
                     WHERE m.organization_id = :organizationId
@@ -123,15 +122,12 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
                         COALESCE(ms.sleep_count, 0) AS sleepCount,
                         COALESCE(ms.drowsy_count + ms.sleep_count, 0) AS totalRiskCount
                     FROM monitoring_sessions ms
-                    JOIN member m
-                      ON m.user_id = ms.user_id
-                     AND m.organization_id = :organizationId
-                     AND m.deleted_at IS NULL
                     JOIN users u
                       ON u.id = ms.user_id
                      AND u.deleted_at IS NULL
                     WHERE ms.deleted_at IS NULL
                       AND ms.mode = 'ORGANIZATION'
+                      AND ms.organization_id = :organizationId
                       AND ms.ended_at_server IS NOT NULL
                     ORDER BY ms.ended_at_server DESC, ms.id DESC
                     LIMIT :limit
@@ -152,12 +148,9 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
                         HOUR(ms.started_at_server) AS hour,
                         COUNT(ms.id) AS sessionCount
                     FROM monitoring_sessions ms
-                    JOIN member m
-                      ON m.user_id = ms.user_id
-                     AND m.organization_id = :organizationId
-                     AND m.deleted_at IS NULL
                     WHERE ms.deleted_at IS NULL
                       AND ms.mode = 'ORGANIZATION'
+                      AND ms.organization_id = :organizationId
                       AND ms.started_at_server >= :rangeStart
                       AND ms.started_at_server < :rangeEndExclusive
                     GROUP BY YEAR(ms.started_at_server), MONTH(ms.started_at_server), DAY(ms.started_at_server), HOUR(ms.started_at_server)
@@ -174,17 +167,15 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
     @Query(
             value = """
                     SELECT
-                        m.organization_id AS organizationId,
+                        ms.organization_id AS organizationId,
                         COUNT(ms.id) AS sessionCount
                     FROM monitoring_sessions ms
-                    JOIN member m
-                      ON m.user_id = ms.user_id
-                     AND m.deleted_at IS NULL
                     WHERE ms.deleted_at IS NULL
                       AND ms.mode = 'ORGANIZATION'
+                      AND ms.organization_id IS NOT NULL
                       AND ms.started_at_server >= :rangeStart
                       AND ms.started_at_server < :rangeEndExclusive
-                    GROUP BY m.organization_id
+                    GROUP BY ms.organization_id
                     """,
             nativeQuery = true
     )
@@ -199,12 +190,9 @@ public interface MonitoringSessionRepository extends JpaRepository<MonitoringSes
                         :organizationId AS organizationId,
                         COUNT(ms.id) AS sessionCount
                     FROM monitoring_sessions ms
-                    JOIN member m
-                      ON m.user_id = ms.user_id
-                     AND m.organization_id = :organizationId
-                     AND m.deleted_at IS NULL
                     WHERE ms.deleted_at IS NULL
                       AND ms.mode = 'ORGANIZATION'
+                      AND ms.organization_id = :organizationId
                       AND ms.started_at_server >= :rangeStart
                       AND ms.started_at_server < :rangeEndExclusive
                     """,

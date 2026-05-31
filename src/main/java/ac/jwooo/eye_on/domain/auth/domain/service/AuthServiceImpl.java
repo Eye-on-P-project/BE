@@ -5,7 +5,7 @@ import ac.jwooo.eye_on.domain.auth.application.dto.request.SignupRequest;
 import ac.jwooo.eye_on.domain.auth.domain.entity.ClientType;
 import ac.jwooo.eye_on.domain.user.domain.entity.User;
 import ac.jwooo.eye_on.domain.user.domain.entity.UserRole;
-import ac.jwooo.eye_on.domain.user.domain.repository.OrganizationCodeRepository;
+import ac.jwooo.eye_on.domain.user.domain.repository.OrganizationRepository;
 import ac.jwooo.eye_on.domain.user.domain.repository.UserRepository;
 import ac.jwooo.eye_on.global.exception.CustomException;
 import ac.jwooo.eye_on.global.exception.ErrorCode;
@@ -24,7 +24,7 @@ import org.springframework.util.StringUtils;
 public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;
-    private final OrganizationCodeRepository organizationCodeRepository;
+    private final OrganizationRepository organizationRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final RedisTokenStore redisTokenStore;
@@ -189,23 +189,23 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private User createAdminForWebSignup(SignupRequest request, String email) {
-        if (!StringUtils.hasText(request.organizationCode())) {
+        if (!StringUtils.hasText(request.organization())) {
             throw new CustomException(ErrorCode.ORGANIZATION_CODE_REQUIRED);
         }
 
-        String organizationCode = normalizeOrganizationCode(request.organizationCode());
-        if (!organizationCodeRepository.existsByCodeAndDeletedAtIsNull(organizationCode)) {
+        String organization = normalizeOrganization(request.organization());
+        if (!organizationRepository.existsByCodeAndDeletedAtIsNull(organization)) {
             throw new CustomException(ErrorCode.ORGANIZATION_CODE_NOT_FOUND);
         }
 
-        if (userRepository.existsByOrganizationCodeAndRoleAndDeletedAtIsNull(organizationCode, UserRole.ADMIN)) {
+        if (userRepository.existsByOrganizationAndRoleAndDeletedAtIsNull(organization, UserRole.ADMIN)) {
             throw new CustomException(ErrorCode.ORGANIZATION_ADMIN_ALREADY_EXISTS);
         }
 
         return User.createAdmin(
                 email,
                 passwordEncoder.encode(request.password()),
-                organizationCode
+                organization
         );
     }
 
@@ -233,7 +233,7 @@ public class AuthServiceImpl implements AuthService {
         return email.trim().toLowerCase();
     }
 
-    private String normalizeOrganizationCode(String organizationCode) {
-        return organizationCode.trim().toUpperCase();
+    private String normalizeOrganization(String organization) {
+        return organization.trim().toUpperCase();
     }
 }

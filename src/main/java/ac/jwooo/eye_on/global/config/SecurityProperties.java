@@ -9,7 +9,6 @@ public record SecurityProperties(
         String cookieSameSite,
         String cookiePath,
         String cookieDomain,
-        boolean exposeSwagger,
-        boolean exposeDevApi
+        boolean exposeSwagger
 ) {
 }

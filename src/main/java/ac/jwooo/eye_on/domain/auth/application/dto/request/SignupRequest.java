@@ -16,7 +16,7 @@ public record SignupRequest(
         @Size(min = 4, max = 72, message = "비밀번호는 4자 이상 72자 이하여야 합니다.")
         String password,
 
-        String organizationCode,
+        String organization,
         String name,
         String nickname,
 
@@ -26,4 +26,3 @@ public record SignupRequest(
         Gender gender
 ) {
 }
-

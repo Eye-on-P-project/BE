@@ -10,7 +10,7 @@ public record MeResponse(
         Long userId,
         String email,
         UserRole role,
-        String organizationCode,
+        String organization,
         String name,
         String nickname,
         Integer age,
@@ -22,7 +22,7 @@ public record MeResponse(
                 user.getId(),
                 user.getEmail(),
                 user.getRole(),
-                user.getOrganizationCode(),
+                user.getOrganization(),
                 user.getName(),
                 user.getNickname(),
                 user.getAge(),
@@ -30,4 +30,3 @@ public record MeResponse(
         );
     }
 }
-

@@ -35,7 +35,7 @@ public interface AuthControllerSpec {
                     ### 📥 **입력 (Input)**
                     - `email` (필수): 사용자 이메일 (예: user@example.com)
                     - `password` (필수): 4~72자의 비밀번호
-                    - `organizationCode` (조건부): **WEB 가입 시 필수** (예: ORG001), **APP 가입 시 무시됨**
+                    - `organization` (조건부): **WEB 가입 시 필수** (예: ORG001), **APP 가입 시 무시됨**
                     - `name` (조건부): APP 가입 시 필수
                     - `nickname` (조건부): APP 가입 시 필수
                     - `age` (조건부): APP 가입 시 필수 (1~120)
@@ -49,7 +49,7 @@ public interface AuthControllerSpec {
                     
                     **[ 클라이언트 타입에 따른 처리 ]**
                     - **WEB 클라이언트 (`X-Client-Type: WEB`)**: 관리자 계정만 가입 가능, refreshToken은 `HttpOnly` 쿠키로 설정됩니다.
-                    - **APP 클라이언트 (`X-Client-Type: APP` 또는 미입력)**: 일반 사용자로만 가입되며 organizationCode는 사용되지 않습니다.
+                    - **APP 클라이언트 (`X-Client-Type: APP` 또는 미입력)**: 일반 사용자로만 가입되며 organization은 사용되지 않습니다.
                     - **조직 관리자 정책**: 조직 코드당 관리자 계정은 1개만 생성할 수 있습니다.
                     """
     )
@@ -89,7 +89,7 @@ public interface AuthControllerSpec {
                                             {
                                               "email": "user@example.com",
                                               "password": "password123",
-                                              "organizationCode": "ORG001",
+                                              "organization": "ORG001",
                                               "name": "홍길동",
                                               "nickname": "길동이",
                                               "age": 25,

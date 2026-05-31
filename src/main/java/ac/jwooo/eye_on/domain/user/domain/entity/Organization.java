@@ -14,9 +14,9 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(name = "organization_codes")
+@Table(name = "organization")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class OrganizationCode extends BaseEntity {
+public class Organization extends BaseEntity {
 
     @Id
     @Tsid
@@ -29,7 +29,7 @@ public class OrganizationCode extends BaseEntity {
     private String description;
 
     @Builder
-    private OrganizationCode(String code, String description) {
+    private Organization(String code, String description) {
         this.code = normalizeCode(code);
         this.description = description;
     }
@@ -38,4 +38,3 @@ public class OrganizationCode extends BaseEntity {
         return code == null ? null : code.trim().toUpperCase();
     }
 }
-

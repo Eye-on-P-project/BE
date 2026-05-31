@@ -33,8 +33,8 @@ public class User extends BaseEntity {
     @Column(nullable = false, length = 20)
     private UserRole role;
 
-    @Column(name = "organization_code", length = 100)
-    private String organizationCode;
+    @Column(name = "organization", length = 100)
+    private String organization;
 
     @Column(length = 100)
     private String name;
@@ -53,7 +53,7 @@ public class User extends BaseEntity {
             String email,
             String passwordHash,
             UserRole role,
-            String organizationCode,
+            String organization,
             String name,
             String nickname,
             Integer age,
@@ -62,19 +62,19 @@ public class User extends BaseEntity {
         this.email = normalizeEmail(email);
         this.passwordHash = passwordHash;
         this.role = role;
-        this.organizationCode = organizationCode;
+        this.organization = organization;
         this.name = name;
         this.nickname = nickname;
         this.age = age;
         this.gender = gender;
     }
 
-    public static User createAdmin(String email, String passwordHash, String organizationCode) {
+    public static User createAdmin(String email, String passwordHash, String organization) {
         return User.builder()
                 .email(email)
                 .passwordHash(passwordHash)
                 .role(UserRole.ADMIN)
-                .organizationCode(organizationCode)
+                .organization(organization)
                 .build();
     }
 

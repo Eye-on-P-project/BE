@@ -1,7 +1,9 @@
 package ac.jwooo.eye_on.domain.user.domain.service;
 
 import ac.jwooo.eye_on.domain.user.application.dto.request.ChangePasswordRequest;
+import ac.jwooo.eye_on.domain.user.domain.entity.Organization;
 import ac.jwooo.eye_on.domain.user.domain.entity.User;
+import ac.jwooo.eye_on.domain.user.domain.repository.OrganizationRepository;
 import ac.jwooo.eye_on.domain.user.domain.repository.UserRepository;
 import ac.jwooo.eye_on.global.exception.CustomException;
 import ac.jwooo.eye_on.global.exception.ErrorCode;
@@ -17,6 +19,7 @@ import org.springframework.util.StringUtils;
 public class UserPasswordServiceImpl implements UserPasswordService {
 
     private final UserRepository userRepository;
+    private final OrganizationRepository organizationRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -25,9 +28,16 @@ public class UserPasswordServiceImpl implements UserPasswordService {
         User user = userRepository.findByIdAndDeletedAtIsNull(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
-        String userOrganization = normalizeOrganization(user.getOrganization());
-        String requestOrganization = normalizeOrganization(request.organization());
-        if (!StringUtils.hasText(userOrganization) || !userOrganization.equals(requestOrganization)) {
+        Long userOrganizationId = user.getOrganization();
+        if (userOrganizationId == null) {
+            throw new CustomException(ErrorCode.ORGANIZATION_CODE_MISMATCH);
+        }
+        Organization organization = organizationRepository.findByIdAndDeletedAtIsNull(userOrganizationId)
+                .orElseThrow(() -> new CustomException(ErrorCode.ORGANIZATION_NOT_FOUND));
+
+        String requestOrganizationCode = normalizeOrganizationCode(request.organization());
+        String userOrganizationCode = normalizeOrganizationCode(organization.getCode());
+        if (!StringUtils.hasText(requestOrganizationCode) || !requestOrganizationCode.equals(userOrganizationCode)) {
             throw new CustomException(ErrorCode.ORGANIZATION_CODE_MISMATCH);
         }
 
@@ -42,7 +52,7 @@ public class UserPasswordServiceImpl implements UserPasswordService {
         user.changePassword(passwordEncoder.encode(request.newPassword()));
     }
 
-    private String normalizeOrganization(String organization) {
-        return organization == null ? null : organization.trim();
+    private String normalizeOrganizationCode(String organizationCode) {
+        return organizationCode == null ? null : organizationCode.trim().toUpperCase();
     }
 }

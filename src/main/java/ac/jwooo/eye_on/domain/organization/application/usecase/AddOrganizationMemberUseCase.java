@@ -32,7 +32,7 @@ public class AddOrganizationMemberUseCase {
         Long organizationId = ownedOrganization.getId();
 
         User targetUser = organizationMemberUserService.getActiveUserByEmail(request.email());
-        if (targetUser.getRole() == UserRole.ADMIN) {
+        if (targetUser.getRole() == UserRole.ADMIN || targetUser.getRole() == UserRole.SYSTEM_ADMIN) {
             throw new CustomException(ErrorCode.ORGANIZATION_MEMBER_ADMIN_NOT_ALLOWED);
         }
 

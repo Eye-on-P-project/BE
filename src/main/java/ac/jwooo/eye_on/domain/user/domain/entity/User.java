@@ -33,8 +33,12 @@ public class User extends BaseEntity {
     @Column(nullable = false, length = 20)
     private UserRole role;
 
-    @Column(name = "organization", length = 100)
-    private String organization;
+    @Column(name = "organization_id")
+    private Long organization;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private UserSubscription subscription;
 
     @Column(length = 100)
     private String name;
@@ -53,7 +57,8 @@ public class User extends BaseEntity {
             String email,
             String passwordHash,
             UserRole role,
-            String organization,
+            Long organization,
+            UserSubscription subscription,
             String name,
             String nickname,
             Integer age,
@@ -63,18 +68,20 @@ public class User extends BaseEntity {
         this.passwordHash = passwordHash;
         this.role = role;
         this.organization = organization;
+        this.subscription = subscription;
         this.name = name;
         this.nickname = nickname;
         this.age = age;
         this.gender = gender;
     }
 
-    public static User createAdmin(String email, String passwordHash, String organization) {
+    public static User createAdmin(String email, String passwordHash, Long organizationId) {
         return User.builder()
                 .email(email)
                 .passwordHash(passwordHash)
                 .role(UserRole.ADMIN)
-                .organization(organization)
+                .organization(organizationId)
+                .subscription(UserSubscription.FREE)
                 .build();
     }
 
@@ -90,6 +97,7 @@ public class User extends BaseEntity {
                 .email(email)
                 .passwordHash(passwordHash)
                 .role(UserRole.USER)
+                .subscription(UserSubscription.FREE)
                 .name(name)
                 .nickname(nickname)
                 .age(age)

@@ -81,26 +81,55 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
-      - name: Deploy over IAP SSH
-        uses: google-github-actions/ssh-compute@v2
-        with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
-          instance_name: ${{ secrets.GCP_INSTANCE }}
-          zone: ${{ secrets.GCP_ZONE }}
-          user: ${{ secrets.GCP_USER }}
-          ssh_private_key: ${{ secrets.GCP_SSH_KEY }}
-          flags: --tunnel-through-iap
-          command: |
-            set -e
-            export APP_DIR="${{ secrets.DEPLOY_APP_DIR }}"
-            if [ -z "${APP_DIR}" ]; then APP_DIR="/opt/eyeon-be"; fi
-            export BRANCH="main"
-            export SERVICE_NAME="${{ secrets.SYSTEMD_SERVICE_NAME }}"
-            if [ -z "${SERVICE_NAME}" ]; then SERVICE_NAME="eyeon-be.service"; fi
-            bash "${APP_DIR}/deploy/deploy.sh"
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Deploy over IAP tunnel
+        shell: bash
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.GCP_SSH_KEY }}
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          GCP_INSTANCE: ${{ secrets.GCP_INSTANCE }}
+          GCP_ZONE: ${{ secrets.GCP_ZONE }}
+          GCP_USER: ${{ secrets.GCP_USER }}
+          DEPLOY_APP_DIR: ${{ secrets.DEPLOY_APP_DIR }}
+          SYSTEMD_SERVICE_NAME: ${{ secrets.SYSTEMD_SERVICE_NAME }}
+        run: |
+          set -euo pipefail
+
+          KEY_FILE="${RUNNER_TEMP}/github_action_to_vm"
+          printf '%s\n' "${SSH_PRIVATE_KEY}" > "${KEY_FILE}"
+          chmod 600 "${KEY_FILE}"
+
+          gcloud compute start-iap-tunnel "${GCP_INSTANCE}" 22 \
+            --project="${GCP_PROJECT_ID}" \
+            --zone="${GCP_ZONE}" \
+            --local-host-port=localhost:2222 \
+            --verbosity=warning &
+          TUNNEL_PID=$!
+          trap 'kill "${TUNNEL_PID}" 2>/dev/null || true' EXIT
+
+          for _ in {1..30}; do
+            if nc -z 127.0.0.1 2222; then
+              break
+            fi
+            sleep 1
+          done
+
+          APP_DIR="${DEPLOY_APP_DIR:-/opt/eyeon-be}"
+          SERVICE_NAME="${SYSTEMD_SERVICE_NAME:-eyeon-be.service}"
+          ssh -i "${KEY_FILE}" \
+            -p 2222 \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "${GCP_USER}@127.0.0.1" \
+            "set -e; export APP_DIR='${APP_DIR}'; export BRANCH='main'; export SERVICE_NAME='${SERVICE_NAME}'; bash '${APP_DIR}/deploy/deploy.sh'"

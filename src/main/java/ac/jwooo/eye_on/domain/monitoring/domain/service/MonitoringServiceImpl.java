@@ -30,6 +30,7 @@ import ac.jwooo.eye_on.domain.monitoring.domain.repository.MonitoringSessionReal
 import ac.jwooo.eye_on.domain.monitoring.domain.repository.MonitoringSessionRepository;
 import ac.jwooo.eye_on.domain.monitoring.domain.repository.NotificationRepository;
 import ac.jwooo.eye_on.domain.monitoring.domain.repository.TimeBucketRiskCountProjection;
+import ac.jwooo.eye_on.domain.organization.domain.entity.OrganizationMember;
 import ac.jwooo.eye_on.domain.organization.domain.repository.OrganizationMemberRepository;
 import ac.jwooo.eye_on.domain.organization.domain.service.OrganizationAccessService;
 import ac.jwooo.eye_on.domain.user.domain.entity.User;
@@ -79,9 +80,11 @@ public class MonitoringServiceImpl implements MonitoringService {
         }
 
         LocalDateTime startedAtApp = truncateToSeconds(request.startedAtApp());
+        Long organizationId = resolveOrganizationIdForSessionStart(userId, request.mode());
 
         MonitoringSession monitoringSession = MonitoringSession.create(
                 userId,
+                organizationId,
                 request.mode(),
                 startedAtApp,
                 now
@@ -271,9 +274,7 @@ public class MonitoringServiceImpl implements MonitoringService {
             return;
         }
 
-        Long organizationId = organizationMemberRepository.findFirstByUserIdAndDeletedAtIsNull(monitoringSession.getUserId())
-                .map(member -> member.getOrganizationId())
-                .orElse(null);
+        Long organizationId = monitoringSession.getOrganizationId();
         if (organizationId == null) {
             return;
         }
@@ -382,5 +383,15 @@ public class MonitoringServiceImpl implements MonitoringService {
 
     private LocalDateTime truncateToSeconds(LocalDateTime value) {
         return value.withNano(0);
+    }
+
+    private Long resolveOrganizationIdForSessionStart(Long userId, MonitoringMode mode) {
+        if (mode != MonitoringMode.ORGANIZATION) {
+            return null;
+        }
+
+        return organizationMemberRepository.findFirstByUserIdAndDeletedAtIsNull(userId)
+                .map(OrganizationMember::getOrganizationId)
+                .orElseThrow(() -> new CustomException(ErrorCode.ORGANIZATION_MEMBER_NOT_FOUND));
     }
 }

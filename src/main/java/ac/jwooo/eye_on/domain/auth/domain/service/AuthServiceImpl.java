@@ -3,9 +3,11 @@ package ac.jwooo.eye_on.domain.auth.domain.service;
 import ac.jwooo.eye_on.domain.auth.application.dto.request.LoginRequest;
 import ac.jwooo.eye_on.domain.auth.application.dto.request.SignupRequest;
 import ac.jwooo.eye_on.domain.auth.domain.entity.ClientType;
+import ac.jwooo.eye_on.domain.user.domain.entity.Organization;
+import ac.jwooo.eye_on.domain.user.domain.entity.OrganizationStatus;
 import ac.jwooo.eye_on.domain.user.domain.entity.User;
 import ac.jwooo.eye_on.domain.user.domain.entity.UserRole;
-import ac.jwooo.eye_on.domain.user.domain.repository.OrganizationCodeRepository;
+import ac.jwooo.eye_on.domain.user.domain.repository.OrganizationRepository;
 import ac.jwooo.eye_on.domain.user.domain.repository.UserRepository;
 import ac.jwooo.eye_on.global.exception.CustomException;
 import ac.jwooo.eye_on.global.exception.ErrorCode;
@@ -13,6 +15,8 @@ import ac.jwooo.eye_on.global.security.JwtTokenProvider;
 import ac.jwooo.eye_on.global.security.RedisTokenStore;
 import ac.jwooo.eye_on.global.security.TokenType;
 import io.jsonwebtoken.Claims;
+import java.security.SecureRandom;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -23,11 +27,16 @@ import org.springframework.util.StringUtils;
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
+    private static final String ORGANIZATION_CODE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    private static final int ORGANIZATION_CODE_LENGTH = 6;
+    private static final int ORGANIZATION_CODE_MAX_ATTEMPTS = 20;
+
     private final UserRepository userRepository;
-    private final OrganizationCodeRepository organizationCodeRepository;
+    private final OrganizationRepository organizationRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final RedisTokenStore redisTokenStore;
+    private final SecureRandom secureRandom = new SecureRandom();
 
     @Override
     @Transactional
@@ -38,11 +47,14 @@ public class AuthServiceImpl implements AuthService {
         }
 
         User newUser = switch (clientType) {
-            case WEB -> createAdminForWebSignup(request, email);
+            case WEB -> createPendingAdminForWebSignup(request, email);
             case APP -> createGeneralUserForAppSignup(request, email);
         };
 
         User savedUser = userRepository.save(newUser);
+        if (clientType == ClientType.WEB) {
+            return new AuthResult(savedUser.getId(), null, null, savedUser.getRole());
+        }
         return issueTokens(savedUser, clientType);
     }
 
@@ -56,8 +68,8 @@ public class AuthServiceImpl implements AuthService {
             throw new CustomException(ErrorCode.INVALID_CREDENTIALS);
         }
 
-        if (clientType == ClientType.WEB && user.getRole() != UserRole.ADMIN) {
-            throw new CustomException(ErrorCode.WEB_ADMIN_LOGIN_ONLY);
+        if (clientType == ClientType.WEB) {
+            validateWebLoginPolicy(user);
         }
 
         return issueTokens(user, clientType);
@@ -94,8 +106,8 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByIdAndDeletedAtIsNull(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
-        if (clientType == ClientType.WEB && user.getRole() != UserRole.ADMIN) {
-            throw new CustomException(ErrorCode.WEB_ADMIN_LOGIN_ONLY);
+        if (clientType == ClientType.WEB) {
+            validateWebLoginPolicy(user);
         }
 
         long oldRefreshTtl = jwtTokenProvider.remainingSeconds(claims);
@@ -188,24 +200,34 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
-    private User createAdminForWebSignup(SignupRequest request, String email) {
-        if (!StringUtils.hasText(request.organizationCode())) {
-            throw new CustomException(ErrorCode.ORGANIZATION_CODE_REQUIRED);
+    private User createPendingAdminForWebSignup(SignupRequest request, String email) {
+        validateWebOrganizationSignupRequest(request);
+
+        if (organizationRepository.existsByCorporateNumAndStatusInAndDeletedAtIsNull(
+                request.corporateNum().trim(),
+                List.of(OrganizationStatus.PENDING, OrganizationStatus.ACTIVE)
+        )) {
+            throw new CustomException(ErrorCode.ORGANIZATION_SIGNUP_ALREADY_EXISTS);
         }
 
-        String organizationCode = normalizeOrganizationCode(request.organizationCode());
-        if (!organizationCodeRepository.existsByCodeAndDeletedAtIsNull(organizationCode)) {
-            throw new CustomException(ErrorCode.ORGANIZATION_CODE_NOT_FOUND);
-        }
-
-        if (userRepository.existsByOrganizationCodeAndRoleAndDeletedAtIsNull(organizationCode, UserRole.ADMIN)) {
-            throw new CustomException(ErrorCode.ORGANIZATION_ADMIN_ALREADY_EXISTS);
-        }
+        String organizationCode = generateOrganizationCode();
+        Organization organization = Organization.createPending(
+                request.organizationName(),
+                organizationCode,
+                request.businessmanNum(),
+                request.establishedAt(),
+                request.representativeName(),
+                request.corporateNum(),
+                request.businessName(),
+                request.coRepresentativeName(),
+                request.businessAddress()
+        );
+        Organization savedOrganization = organizationRepository.save(organization);
 
         return User.createAdmin(
                 email,
                 passwordEncoder.encode(request.password()),
-                organizationCode
+                savedOrganization.getId()
         );
     }
 
@@ -233,7 +255,68 @@ public class AuthServiceImpl implements AuthService {
         return email.trim().toLowerCase();
     }
 
-    private String normalizeOrganizationCode(String organizationCode) {
-        return organizationCode.trim().toUpperCase();
+    private void validateWebOrganizationSignupRequest(SignupRequest request) {
+        if (!StringUtils.hasText(request.organizationName())) {
+            throw new CustomException(ErrorCode.ORGANIZATION_NAME_REQUIRED);
+        }
+        if (!StringUtils.hasText(request.businessmanNum())) {
+            throw new CustomException(ErrorCode.BUSINESSMAN_NUM_REQUIRED);
+        }
+        if (request.establishedAt() == null) {
+            throw new CustomException(ErrorCode.ESTABLISHED_AT_REQUIRED);
+        }
+        if (!StringUtils.hasText(request.representativeName())) {
+            throw new CustomException(ErrorCode.REPRESENTATIVE_NAME_REQUIRED);
+        }
+        if (!StringUtils.hasText(request.corporateNum())) {
+            throw new CustomException(ErrorCode.CORPORATE_NUM_REQUIRED);
+        }
+        if (!StringUtils.hasText(request.businessName())) {
+            throw new CustomException(ErrorCode.BUSINESS_NAME_REQUIRED);
+        }
     }
+
+    private void validateWebLoginPolicy(User user) {
+        if (user.getRole() != UserRole.ADMIN && user.getRole() != UserRole.SYSTEM_ADMIN) {
+            throw new CustomException(ErrorCode.WEB_ADMIN_LOGIN_ONLY);
+        }
+        if (user.getRole() == UserRole.SYSTEM_ADMIN) {
+            return;
+        }
+
+        Long organizationId = user.getOrganization();
+        if (organizationId == null) {
+            throw new CustomException(ErrorCode.ORGANIZATION_NOT_FOUND);
+        }
+
+        Organization organization = organizationRepository.findByIdAndDeletedAtIsNull(organizationId)
+                .orElseThrow(() -> new CustomException(ErrorCode.ORGANIZATION_NOT_FOUND));
+
+        if (organization.getStatus() == OrganizationStatus.PENDING) {
+            throw new CustomException(ErrorCode.ORGANIZATION_SIGNUP_PENDING);
+        }
+        if (organization.getStatus() == OrganizationStatus.REJECTED) {
+            throw new CustomException(ErrorCode.ORGANIZATION_SIGNUP_REJECTED);
+        }
+    }
+
+    private String generateOrganizationCode() {
+        for (int attempt = 0; attempt < ORGANIZATION_CODE_MAX_ATTEMPTS; attempt += 1) {
+            String code = randomOrganizationCode();
+            if (!organizationRepository.existsByCodeAndDeletedAtIsNull(code)) {
+                return code;
+            }
+        }
+        throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR, "조직 코드를 생성하지 못했습니다.");
+    }
+
+    private String randomOrganizationCode() {
+        StringBuilder builder = new StringBuilder(ORGANIZATION_CODE_LENGTH);
+        for (int i = 0; i < ORGANIZATION_CODE_LENGTH; i += 1) {
+            int randomIndex = secureRandom.nextInt(ORGANIZATION_CODE_CHARS.length());
+            builder.append(ORGANIZATION_CODE_CHARS.charAt(randomIndex));
+        }
+        return builder.toString();
+    }
+
 }

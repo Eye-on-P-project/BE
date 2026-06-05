@@ -28,11 +28,8 @@ public interface MonitoringEventLogRepository extends JpaRepository<MonitoringEv
                       ON ms.id = mel.session_id
                      AND ms.deleted_at IS NULL
                      AND ms.mode = 'ORGANIZATION'
-                    JOIN member m
-                      ON m.user_id = ms.user_id
-                     AND m.organization_id = :organizationId
-                     AND m.deleted_at IS NULL
                     WHERE mel.deleted_at IS NULL
+                      AND ms.organization_id = :organizationId
                       AND mel.event_type IN ('DROWSY', 'SLEEP')
                       AND mel.occurred_at_server >= :rangeStart
                       AND mel.occurred_at_server < :rangeEndExclusive
@@ -50,7 +47,7 @@ public interface MonitoringEventLogRepository extends JpaRepository<MonitoringEv
     @Query(
             value = """
                     SELECT
-                        m.organization_id AS organizationId,
+                        ms.organization_id AS organizationId,
                         COALESCE(SUM(CASE WHEN mel.event_type = 'DROWSY' THEN 1 ELSE 0 END), 0) AS drowsyCount,
                         COALESCE(SUM(CASE WHEN mel.event_type = 'SLEEP' THEN 1 ELSE 0 END), 0) AS sleepCount,
                         COUNT(*) AS totalRiskCount
@@ -59,14 +56,12 @@ public interface MonitoringEventLogRepository extends JpaRepository<MonitoringEv
                       ON ms.id = mel.session_id
                      AND ms.deleted_at IS NULL
                      AND ms.mode = 'ORGANIZATION'
-                    JOIN member m
-                      ON m.user_id = ms.user_id
-                     AND m.deleted_at IS NULL
                     WHERE mel.deleted_at IS NULL
+                      AND ms.organization_id IS NOT NULL
                       AND mel.event_type IN ('DROWSY', 'SLEEP')
                       AND mel.occurred_at_server >= :rangeStart
                       AND mel.occurred_at_server < :rangeEndExclusive
-                    GROUP BY m.organization_id
+                    GROUP BY ms.organization_id
                     """,
             nativeQuery = true
     )
@@ -78,7 +73,7 @@ public interface MonitoringEventLogRepository extends JpaRepository<MonitoringEv
     @Query(
             value = """
                     SELECT
-                        m.organization_id AS organizationId,
+                        ms.organization_id AS organizationId,
                         ms.user_id AS userId,
                         COALESCE(SUM(CASE WHEN mel.event_type = 'DROWSY' THEN 1 ELSE 0 END), 0) AS drowsyCount,
                         COALESCE(SUM(CASE WHEN mel.event_type = 'SLEEP' THEN 1 ELSE 0 END), 0) AS sleepCount,
@@ -88,14 +83,12 @@ public interface MonitoringEventLogRepository extends JpaRepository<MonitoringEv
                       ON ms.id = mel.session_id
                      AND ms.deleted_at IS NULL
                      AND ms.mode = 'ORGANIZATION'
-                    JOIN member m
-                      ON m.user_id = ms.user_id
-                     AND m.deleted_at IS NULL
                     WHERE mel.deleted_at IS NULL
+                      AND ms.organization_id IS NOT NULL
                       AND mel.event_type IN ('DROWSY', 'SLEEP')
                       AND mel.occurred_at_server >= :rangeStart
                       AND mel.occurred_at_server < :rangeEndExclusive
-                    GROUP BY m.organization_id, ms.user_id
+                    GROUP BY ms.organization_id, ms.user_id
                     """,
             nativeQuery = true
     )
@@ -116,11 +109,8 @@ public interface MonitoringEventLogRepository extends JpaRepository<MonitoringEv
                       ON ms.id = mel.session_id
                      AND ms.deleted_at IS NULL
                      AND ms.mode = 'ORGANIZATION'
-                    JOIN member m
-                      ON m.user_id = ms.user_id
-                     AND m.organization_id = :organizationId
-                     AND m.deleted_at IS NULL
                     WHERE mel.deleted_at IS NULL
+                      AND ms.organization_id = :organizationId
                       AND mel.event_type IN ('DROWSY', 'SLEEP')
                       AND mel.occurred_at_server >= :rangeStart
                       AND mel.occurred_at_server < :rangeEndExclusive
@@ -136,7 +126,7 @@ public interface MonitoringEventLogRepository extends JpaRepository<MonitoringEv
     @Query(
             value = """
                     SELECT
-                        m.organization_id AS organizationId,
+                        ms.organization_id AS organizationId,
                         ms.user_id AS userId,
                         COALESCE(SUM(CASE WHEN mel.event_type = 'DROWSY' THEN 1 ELSE 0 END), 0) AS drowsyCount,
                         COALESCE(SUM(CASE WHEN mel.event_type = 'SLEEP' THEN 1 ELSE 0 END), 0) AS sleepCount,
@@ -146,11 +136,8 @@ public interface MonitoringEventLogRepository extends JpaRepository<MonitoringEv
                       ON ms.id = mel.session_id
                      AND ms.deleted_at IS NULL
                      AND ms.mode = 'ORGANIZATION'
-                    JOIN member m
-                      ON m.user_id = ms.user_id
-                     AND m.organization_id = :organizationId
-                     AND m.deleted_at IS NULL
                     WHERE mel.deleted_at IS NULL
+                      AND ms.organization_id = :organizationId
                       AND mel.event_type IN ('DROWSY', 'SLEEP')
                       AND mel.occurred_at_server >= :rangeStart
                       AND mel.occurred_at_server < :rangeEndExclusive

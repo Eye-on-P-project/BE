@@ -33,8 +33,12 @@ public class User extends BaseEntity {
     @Column(nullable = false, length = 20)
     private UserRole role;
 
-    @Column(name = "organization_code", length = 100)
-    private String organizationCode;
+    @Column(name = "organization_id")
+    private Long organization;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private UserSubscription subscription;
 
     @Column(length = 100)
     private String name;
@@ -53,7 +57,8 @@ public class User extends BaseEntity {
             String email,
             String passwordHash,
             UserRole role,
-            String organizationCode,
+            Long organization,
+            UserSubscription subscription,
             String name,
             String nickname,
             Integer age,
@@ -62,19 +67,21 @@ public class User extends BaseEntity {
         this.email = normalizeEmail(email);
         this.passwordHash = passwordHash;
         this.role = role;
-        this.organizationCode = organizationCode;
+        this.organization = organization;
+        this.subscription = subscription;
         this.name = name;
         this.nickname = nickname;
         this.age = age;
         this.gender = gender;
     }
 
-    public static User createAdmin(String email, String passwordHash, String organizationCode) {
+    public static User createAdmin(String email, String passwordHash, Long organizationId) {
         return User.builder()
                 .email(email)
                 .passwordHash(passwordHash)
                 .role(UserRole.ADMIN)
-                .organizationCode(organizationCode)
+                .organization(organizationId)
+                .subscription(UserSubscription.FREE)
                 .build();
     }
 
@@ -90,6 +97,7 @@ public class User extends BaseEntity {
                 .email(email)
                 .passwordHash(passwordHash)
                 .role(UserRole.USER)
+                .subscription(UserSubscription.FREE)
                 .name(name)
                 .nickname(nickname)
                 .age(age)

@@ -23,6 +23,8 @@ import lombok.NoArgsConstructor;
         indexes = {
                 @Index(name = "idx_ms_user_active", columnList = "user_id,ended_at_server,deleted_at"),
                 @Index(name = "idx_ms_user_started", columnList = "user_id,started_at_server,deleted_at"),
+                @Index(name = "idx_ms_org_mode_active", columnList = "organization_id,mode,ended_at_server,deleted_at"),
+                @Index(name = "idx_ms_org_mode_started", columnList = "organization_id,mode,started_at_server,deleted_at"),
                 @Index(name = "idx_ms_started_app", columnList = "started_at_app,deleted_at,user_id"),
                 @Index(name = "idx_ms_mode_started_app", columnList = "mode,started_at_app,deleted_at,user_id"),
                 @Index(name = "idx_ms_mode_active", columnList = "mode,ended_at_server,deleted_at,user_id")
@@ -37,6 +39,9 @@ public class MonitoringSession extends BaseEntity {
 
     @Column(name = "user_id", nullable = false)
     private Long userId;
+
+    @Column(name = "organization_id")
+    private Long organizationId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -66,6 +71,7 @@ public class MonitoringSession extends BaseEntity {
     @Builder(access = AccessLevel.PRIVATE)
     private MonitoringSession(
             Long userId,
+            Long organizationId,
             MonitoringMode mode,
             LocalDateTime startedAtApp,
             LocalDateTime startedAtServer,
@@ -76,6 +82,7 @@ public class MonitoringSession extends BaseEntity {
             Integer sleepCount
     ) {
         this.userId = userId;
+        this.organizationId = organizationId;
         this.mode = mode;
         this.startedAtApp = startedAtApp;
         this.startedAtServer = startedAtServer;
@@ -88,12 +95,14 @@ public class MonitoringSession extends BaseEntity {
 
     public static MonitoringSession create(
             Long userId,
+            Long organizationId,
             MonitoringMode mode,
             LocalDateTime startedAtApp,
             LocalDateTime startedAtServer
     ) {
         return MonitoringSession.builder()
                 .userId(userId)
+                .organizationId(organizationId)
                 .mode(mode)
                 .startedAtApp(startedAtApp)
                 .startedAtServer(startedAtServer)

@@ -94,7 +94,9 @@ public class AuthController implements AuthControllerSpec {
 
     private AuthTokenResponse buildAuthResponse(AuthResult authResult, ClientType clientType, HttpServletResponse response) {
         if (clientType == ClientType.WEB) {
-            setRefreshCookie(response, authResult.refreshToken());
+            if (StringUtils.hasText(authResult.refreshToken())) {
+                setRefreshCookie(response, authResult.refreshToken());
+            }
             return AuthTokenResponse.from(authResult, null);
         }
         return AuthTokenResponse.from(authResult, authResult.refreshToken());

@@ -14,6 +14,6 @@ public record ChangePasswordRequest(
 
         @NotBlank(message = "조직 코드는 필수입니다.")
         @Size(max = 100, message = "조직 코드는 100자 이하여야 합니다.")
-        String organizationCode
+        String organization
 ) {
 }

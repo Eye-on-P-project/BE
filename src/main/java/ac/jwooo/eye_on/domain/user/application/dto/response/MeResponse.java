@@ -2,6 +2,7 @@ package ac.jwooo.eye_on.domain.user.application.dto.response;
 
 import ac.jwooo.eye_on.domain.user.domain.entity.Gender;
 import ac.jwooo.eye_on.domain.user.domain.entity.UserRole;
+import ac.jwooo.eye_on.domain.user.domain.entity.UserSubscription;
 import ac.jwooo.eye_on.domain.user.domain.entity.User;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
@@ -10,7 +11,9 @@ public record MeResponse(
         Long userId,
         String email,
         UserRole role,
-        String organizationCode,
+        @JsonFormat(shape = JsonFormat.Shape.STRING)
+        Long organization,
+        UserSubscription subscription,
         String name,
         String nickname,
         Integer age,
@@ -22,7 +25,8 @@ public record MeResponse(
                 user.getId(),
                 user.getEmail(),
                 user.getRole(),
-                user.getOrganizationCode(),
+                user.getOrganization(),
+                user.getSubscription(),
                 user.getName(),
                 user.getNickname(),
                 user.getAge(),
@@ -30,4 +34,3 @@ public record MeResponse(
         );
     }
 }
-

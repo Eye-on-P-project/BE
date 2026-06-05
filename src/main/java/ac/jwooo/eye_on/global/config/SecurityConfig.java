@@ -49,10 +49,6 @@ public class SecurityConfig {
                     authorize.requestMatchers("/api/auth/signup", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout").permitAll();
                     authorize.requestMatchers("/actuator/health").permitAll();
 
-                    if (securityProperties.exposeDevApi()) {
-                        authorize.requestMatchers("/api/users/dev/organizations", "/api/users/dev/organizations/**").permitAll();
-                    }
-
                     if (securityProperties.exposeSwagger()) {
                         authorize.requestMatchers(
                                 "/swagger-ui.html",

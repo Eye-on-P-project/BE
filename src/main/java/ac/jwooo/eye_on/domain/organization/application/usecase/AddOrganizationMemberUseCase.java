@@ -6,7 +6,7 @@ import ac.jwooo.eye_on.domain.organization.domain.entity.OrganizationMember;
 import ac.jwooo.eye_on.domain.organization.domain.service.OrganizationAccessService;
 import ac.jwooo.eye_on.domain.organization.domain.service.OrganizationMemberService;
 import ac.jwooo.eye_on.domain.organization.domain.service.OrganizationMemberUserService;
-import ac.jwooo.eye_on.domain.user.domain.entity.OrganizationCode;
+import ac.jwooo.eye_on.domain.user.domain.entity.Organization;
 import ac.jwooo.eye_on.domain.user.domain.entity.User;
 import ac.jwooo.eye_on.domain.user.domain.entity.UserRole;
 import ac.jwooo.eye_on.global.exception.CustomException;
@@ -28,11 +28,11 @@ public class AddOrganizationMemberUseCase {
             Long requesterUserId,
             AddOrganizationMemberRequest request
     ) {
-        OrganizationCode ownedOrganization = organizationAccessService.resolveOwnedOrganization(requesterUserId);
+        Organization ownedOrganization = organizationAccessService.resolveOwnedOrganization(requesterUserId);
         Long organizationId = ownedOrganization.getId();
 
         User targetUser = organizationMemberUserService.getActiveUserByEmail(request.email());
-        if (targetUser.getRole() == UserRole.ADMIN) {
+        if (targetUser.getRole() == UserRole.ADMIN || targetUser.getRole() == UserRole.SYSTEM_ADMIN) {
             throw new CustomException(ErrorCode.ORGANIZATION_MEMBER_ADMIN_NOT_ALLOWED);
         }
 

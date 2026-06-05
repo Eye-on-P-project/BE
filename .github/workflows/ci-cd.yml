@@ -127,9 +127,45 @@ jobs:
 
           APP_DIR="${DEPLOY_APP_DIR:-/opt/eyeon-be}"
           SERVICE_NAME="${SYSTEMD_SERVICE_NAME:-eyeon-be.service}"
+          REMOTE_SCRIPT="$(mktemp)"
+          cat > "${REMOTE_SCRIPT}" <<'REMOTE_EOF'
+          set -euo pipefail
+
+          echo "[deploy-bootstrap] app_dir=${APP_DIR}, branch=${BRANCH}, service=${SERVICE_NAME}"
+
+          if [ ! -d "${APP_DIR}" ]; then
+            echo "[deploy-bootstrap] ERROR: APP_DIR does not exist: ${APP_DIR}"
+            exit 1
+          fi
+
+          cd "${APP_DIR}"
+
+          if [ ! -d ".git" ]; then
+            echo "[deploy-bootstrap] ERROR: APP_DIR is not a git repository: ${APP_DIR}"
+            echo "[deploy-bootstrap] Current files:"
+            ls -la
+            exit 1
+          fi
+
+          echo "[deploy-bootstrap] Sync latest deploy script"
+          git fetch origin "${BRANCH}"
+          git checkout "${BRANCH}"
+          git reset --hard "origin/${BRANCH}"
+
+          if [ ! -f "deploy/deploy.sh" ]; then
+            echo "[deploy-bootstrap] ERROR: deploy/deploy.sh is still missing after git sync"
+            echo "[deploy-bootstrap] Current files:"
+            ls -la
+            exit 1
+          fi
+
+          chmod +x deploy/deploy.sh
+          bash deploy/deploy.sh
+          REMOTE_EOF
+
           ssh -i "${KEY_FILE}" \
             -p 2222 \
             -o StrictHostKeyChecking=no \
             -o UserKnownHostsFile=/dev/null \
             "${GCP_USER}@127.0.0.1" \
-            "set -e; export APP_DIR='${APP_DIR}'; export BRANCH='main'; export SERVICE_NAME='${SERVICE_NAME}'; bash '${APP_DIR}/deploy/deploy.sh'"
+            "APP_DIR='${APP_DIR}' BRANCH='main' SERVICE_NAME='${SERVICE_NAME}' bash -s" < "${REMOTE_SCRIPT}"

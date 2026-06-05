@@ -81,6 +81,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
         with:

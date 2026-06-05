@@ -32,7 +32,7 @@ public interface OrganizationMemberControllerSpec {
                     
                     **동작 방식**:
                     - 요청받은 `email`로 시스템 내 사용자를 검색합니다.
-                    - 조직 ID는 클라이언트로부터 직접 받지 않고, 현재 로그인한 관리자 계정의 `organization_code`를 기준으로 조직 PK를 찾아 매핑합니다.
+                    - 조직 ID는 클라이언트로부터 직접 받지 않고, 현재 로그인한 관리자 계정의 `organization`(조직 ID)을 기준으로 조직 PK를 찾아 매핑합니다.
                     """,
             security = @SecurityRequirement(name = "bearerAuth")
     )
@@ -95,7 +95,7 @@ public interface OrganizationMemberControllerSpec {
                     현재 로그인한 관리자에게 속한 조직의 모든 구성원 목록을 조회합니다.
                     
                     **동작 방식**:
-                    - 관리자(Admin) 계정의 `organization_code`를 기준으로 조직 PK를 찾습니다.
+                    - 관리자(Admin) 계정의 `organization`(조직 ID)을 기준으로 조직 PK를 찾습니다.
                     - 해당 조직에 속해있으며 **삭제되지 않은 구성원(소프트 딜리트 필터링)** 들을 생성일(가입일) 내림차순으로 반환합니다.
                     - 각 구성원별 응답에서는 회원 PK, 이름, 역할, 이메일 등의 상세 정보가 포함됩니다.
                     """,
@@ -151,7 +151,7 @@ public interface OrganizationMemberControllerSpec {
                     
                     **동작 방식**:
                     - 요청 시 제시된 `memberId` (구성원의 PK)를 기준으로 삭제 작업을 수행합니다.
-                    - 조직 ID는 관리자의 `organization_code`로부터 알아내며, 다른 조직의 구성원은 지울 수 없습니다.
+                    - 조직 ID는 관리자의 `organization`(조직 ID)로부터 알아내며, 다른 조직의 구성원은 지울 수 없습니다.
                     - 성공 시 `success: true` 형태의 JSON을 반환합니다.
                     """,
             security = @SecurityRequirement(name = "bearerAuth")

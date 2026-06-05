@@ -10,7 +10,6 @@ import ac.jwooo.eye_on.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 @Service
 @RequiredArgsConstructor
@@ -26,8 +25,7 @@ public class OrganizationAccessServiceImpl implements OrganizationAccessService 
         Organization organization = organizationRepository.findByIdAndDeletedAtIsNull(organizationId)
                 .orElseThrow(() -> new CustomException(ErrorCode.ORGANIZATION_NOT_FOUND));
 
-        String requesterOrganization = normalizeOrganization(requester.getOrganization());
-        if (!organization.getCode().equalsIgnoreCase(requesterOrganization)) {
+        if (requester.getOrganization() == null || !organization.getId().equals(requester.getOrganization())) {
             throw new CustomException(ErrorCode.ORGANIZATION_ACCESS_DENIED);
         }
 
@@ -37,9 +35,12 @@ public class OrganizationAccessServiceImpl implements OrganizationAccessService 
     @Override
     public Organization resolveOwnedOrganization(Long requesterUserId) {
         User requester = getAdminRequester(requesterUserId);
-        String requesterOrganization = normalizeOrganization(requester.getOrganization());
+        Long requesterOrganizationId = requester.getOrganization();
+        if (requesterOrganizationId == null) {
+            throw new CustomException(ErrorCode.ORGANIZATION_NOT_FOUND);
+        }
 
-        return organizationRepository.findByCodeAndDeletedAtIsNull(requesterOrganization)
+        return organizationRepository.findByIdAndDeletedAtIsNull(requesterOrganizationId)
                 .orElseThrow(() -> new CustomException(ErrorCode.ORGANIZATION_NOT_FOUND));
     }
 
@@ -53,10 +54,4 @@ public class OrganizationAccessServiceImpl implements OrganizationAccessService 
         return requester;
     }
 
-    private String normalizeOrganization(String organization) {
-        if (!StringUtils.hasText(organization)) {
-            throw new CustomException(ErrorCode.ORGANIZATION_ACCESS_DENIED);
-        }
-        return organization.trim().toUpperCase();
-    }
 }

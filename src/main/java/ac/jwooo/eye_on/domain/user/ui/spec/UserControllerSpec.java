@@ -40,8 +40,9 @@ public interface UserControllerSpec {
                                             {
                                               "userId": "123456789012345678",
                                               "email": "user@example.com",
-                                              "role": "ROLE_USER",
-                                              "organization": "ORG001",
+                                              "role": "USER",
+                                              "organization": "400010020000000001",
+                                              "subscription": "FREE",
                                               "name": "홍길동",
                                               "nickname": "길동이",
                                               "age": 25,

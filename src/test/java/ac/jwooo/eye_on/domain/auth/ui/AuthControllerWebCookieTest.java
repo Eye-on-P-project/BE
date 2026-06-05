@@ -39,7 +39,7 @@ class AuthControllerWebCookieTest {
 
     @BeforeEach
     void setUp() {
-        SecurityProperties securityProperties = new SecurityProperties("refreshToken", false, "Lax", "/", "", false, false);
+        SecurityProperties securityProperties = new SecurityProperties("refreshToken", false, "Lax", "/", "", false);
         JwtProperties jwtProperties = new JwtProperties("test-secret-key-test-secret-key", 900, 1209600);
         AuthController authController = new AuthController(authService, securityProperties, jwtProperties);
         mockMvc = MockMvcBuilders.standaloneSetup(authController).build();
@@ -99,5 +99,33 @@ class AuthControllerWebCookieTest {
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("HttpOnly")));
 
         verify(authService).logout("access-token", "refresh-token", ClientType.WEB);
+    }
+
+    @Test
+    @DisplayName("WEB 회원가입이 승인 대기 응답일 때 refresh 쿠키를 설정하지 않는다")
+    void signupForWebPendingDoesNotSetRefreshCookie() throws Exception {
+        when(authService.signup(any(), eq(ClientType.WEB)))
+                .thenReturn(new AuthResult(10L, null, null, UserRole.ADMIN));
+
+        mockMvc.perform(post("/api/auth/signup")
+                        .header("X-Client-Type", "WEB")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "pending-admin@eyeon.com",
+                                  "password": "password1234",
+                                  "organizationName": "삼성전자",
+                                  "businessmanNum": "1234567890",
+                                  "establishedAt": "1995-01-01",
+                                  "representativeName": "홍길동",
+                                  "corporateNum": "1101111234567",
+                                  "businessName": "삼성전자 주식회사"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value("10"))
+                .andExpect(jsonPath("$.accessToken").value(nullValue()))
+                .andExpect(jsonPath("$.refreshToken").value(nullValue()))
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
     }
 }

@@ -18,5 +18,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     List<User> findAllByIdInAndDeletedAtIsNull(Collection<Long> ids);
 
-    boolean existsByOrganizationAndRoleAndDeletedAtIsNull(String organization, UserRole role);
+    boolean existsByOrganizationAndRoleAndDeletedAtIsNull(Long organization, UserRole role);
+
+    Optional<User> findFirstByOrganizationAndRoleAndDeletedAtIsNull(Long organization, UserRole role);
+
+    List<User> findAllByOrganizationInAndRoleAndDeletedAtIsNull(Collection<Long> organizations, UserRole role);
 }

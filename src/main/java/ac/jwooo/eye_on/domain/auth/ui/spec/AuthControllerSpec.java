@@ -35,7 +35,14 @@ public interface AuthControllerSpec {
                     ### 📥 **입력 (Input)**
                     - `email` (필수): 사용자 이메일 (예: user@example.com)
                     - `password` (필수): 4~72자의 비밀번호
-                    - `organization` (조건부): **WEB 가입 시 필수** (예: ORG001), **APP 가입 시 무시됨**
+                    - `organizationName` (WEB 필수): 조직/기업 이름
+                    - `businessmanNum` (WEB 필수): 사업자등록번호
+                    - `establishedAt` (WEB 필수): 개업일자
+                    - `representativeName` (WEB 필수): 대표자 이름
+                    - `corporateNum` (WEB 필수): 법인등록번호
+                    - `businessName` (WEB 필수): 상호명
+                    - `coRepresentativeName` (WEB 선택): 공동대표자 이름
+                    - `businessAddress` (WEB 선택): 사업장 주소
                     - `name` (조건부): APP 가입 시 필수
                     - `nickname` (조건부): APP 가입 시 필수
                     - `age` (조건부): APP 가입 시 필수 (1~120)
@@ -49,8 +56,8 @@ public interface AuthControllerSpec {
                     
                     **[ 클라이언트 타입에 따른 처리 ]**
                     - **WEB 클라이언트 (`X-Client-Type: WEB`)**: 관리자 계정만 가입 가능, refreshToken은 `HttpOnly` 쿠키로 설정됩니다.
-                    - **APP 클라이언트 (`X-Client-Type: APP` 또는 미입력)**: 일반 사용자로만 가입되며 organization은 사용되지 않습니다.
-                    - **조직 관리자 정책**: 조직 코드당 관리자 계정은 1개만 생성할 수 있습니다.
+                    - **WEB 클라이언트 가입 결과**: 조직 신청으로 접수되며 즉시 로그인 토큰이 발급되지 않습니다(승인 대기).
+                    - **APP 클라이언트 (`X-Client-Type: APP` 또는 미입력)**: 일반 사용자로 가입되며 조직 신청 필드는 사용되지 않습니다.
                     """
     )
     @ApiResponses({
@@ -89,7 +96,12 @@ public interface AuthControllerSpec {
                                             {
                                               "email": "user@example.com",
                                               "password": "password123",
-                                              "organization": "ORG001",
+                                              "organizationName": "삼성전자",
+                                              "businessmanNum": "1234567890",
+                                              "establishedAt": "1995-01-01",
+                                              "representativeName": "홍길동",
+                                              "corporateNum": "1101111234567",
+                                              "businessName": "삼성전자 주식회사",
                                               "name": "홍길동",
                                               "nickname": "길동이",
                                               "age": 25,

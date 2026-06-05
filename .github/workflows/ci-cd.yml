@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: be-prod-deploy
@@ -80,15 +81,22 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - name: Deploy over SSH
-        uses: appleboy/ssh-action@v1
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
         with:
-          host: ${{ secrets.GCP_HOST }}
-          username: ${{ secrets.GCP_USER }}
-          key: ${{ secrets.GCP_SSH_KEY }}
-          port: ${{ secrets.GCP_PORT }}
-          fingerprint: ${{ secrets.GCP_HOST_FINGERPRINT }}
-          script: |
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Deploy over IAP SSH
+        uses: google-github-actions/ssh-compute@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          instance_name: ${{ secrets.GCP_INSTANCE }}
+          zone: ${{ secrets.GCP_ZONE }}
+          user: ${{ secrets.GCP_USER }}
+          ssh_private_key: ${{ secrets.GCP_SSH_KEY }}
+          flags: --tunnel-through-iap
+          command: |
             set -e
             export APP_DIR="${{ secrets.DEPLOY_APP_DIR }}"
             if [ -z "${APP_DIR}" ]; then APP_DIR="/opt/eyeon-be"; fi

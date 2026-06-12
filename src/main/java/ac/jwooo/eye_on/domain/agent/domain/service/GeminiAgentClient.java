@@ -34,10 +34,10 @@ public class GeminiAgentClient {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
-    public String generateReply(AgentDrivingState drivingState, String message) {
+    public GeminiAgentReply generateReply(AgentDrivingState drivingState, String message) {
         if (!geminiProperties.hasApiKey()) {
             log.warn("Gemini API key is not configured. Returning fallback agent reply.");
-            return fallbackReply(drivingState);
+            return fallbackReply(drivingState, "FALLBACK_NO_API_KEY");
         }
 
         try {
@@ -52,24 +52,24 @@ public class GeminiAgentClient {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 log.warn("Gemini API returned non-2xx status. status={}, body={}", response.statusCode(), response.body());
-                return fallbackReply(drivingState);
+                return fallbackReply(drivingState, "FALLBACK_GEMINI_HTTP_" + response.statusCode());
             }
 
             String reply = extractReply(response.body());
             if (reply.isBlank()) {
-                return fallbackReply(drivingState);
+                return fallbackReply(drivingState, "FALLBACK_EMPTY_REPLY");
             }
-            return sanitize(reply);
+            return new GeminiAgentReply(sanitize(reply), "GEMINI");
         } catch (IOException e) {
             log.warn("Failed to call Gemini API.", e);
-            return fallbackReply(drivingState);
+            return fallbackReply(drivingState, "FALLBACK_IO_ERROR");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.warn("Gemini API call was interrupted.", e);
-            return fallbackReply(drivingState);
+            return fallbackReply(drivingState, "FALLBACK_INTERRUPTED");
         } catch (RuntimeException e) {
             log.warn("Unexpected Gemini API error.", e);
-            return fallbackReply(drivingState);
+            return fallbackReply(drivingState, "FALLBACK_RUNTIME_ERROR");
         }
     }
 
@@ -144,11 +144,12 @@ public class GeminiAgentClient {
         return compactReply.substring(0, 180).trim() + "...";
     }
 
-    private String fallbackReply(AgentDrivingState drivingState) {
-        return switch (drivingState) {
+    private GeminiAgentReply fallbackReply(AgentDrivingState drivingState, String source) {
+        String reply = switch (drivingState) {
             case SLEEP -> "지금은 대화보다 안전이 먼저예요. 알람을 듣고 가능한 곳에 정차해 쉬어가요.";
             case DROWSY -> "눈이 조금 무거워 보여요. 창문을 조금 열고 가까운 곳에서 잠깐 쉬어가요.";
             case AWAKE, NORMAL -> "좋아요. 제가 옆에서 같이 집중할게요. 필요하면 편하게 말 걸어주세요.";
         };
+        return new GeminiAgentReply(reply, source);
     }
 }

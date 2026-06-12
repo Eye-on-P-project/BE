@@ -2,6 +2,7 @@ package ac.jwooo.eye_on.domain.agent.application.usecase;
 
 import ac.jwooo.eye_on.domain.agent.application.dto.request.AgentChatRequest;
 import ac.jwooo.eye_on.domain.agent.application.dto.response.AgentChatResponse;
+import ac.jwooo.eye_on.domain.agent.domain.service.GeminiAgentReply;
 import ac.jwooo.eye_on.domain.agent.domain.service.AgentSubscriptionService;
 import ac.jwooo.eye_on.domain.agent.domain.service.GeminiAgentClient;
 import ac.jwooo.eye_on.global.exception.CustomException;
@@ -23,7 +24,7 @@ public class ChatWithAgentUseCase {
             throw new CustomException(ErrorCode.AGENT_SUBSCRIPTION_REQUIRED);
         }
 
-        String reply = geminiAgentClient.generateReply(request.drivingState(), request.message());
-        return new AgentChatResponse(reply);
+        GeminiAgentReply reply = geminiAgentClient.generateReply(request.drivingState(), request.message());
+        return new AgentChatResponse(reply.text(), reply.source());
     }
 }

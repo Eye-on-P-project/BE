@@ -8,13 +8,15 @@ public record GeminiProperties(
         String model,
         String endpoint,
         int timeoutSeconds,
-        int maxOutputTokens
+        int maxOutputTokens,
+        int thinkingBudget
 ) {
 
     private static final String DEFAULT_MODEL = "gemini-3.5-flash";
     private static final String DEFAULT_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
     private static final int DEFAULT_TIMEOUT_SECONDS = 8;
-    private static final int DEFAULT_MAX_OUTPUT_TOKENS = 160;
+    private static final int DEFAULT_MAX_OUTPUT_TOKENS = 512;
+    private static final int DEFAULT_THINKING_BUDGET = 0;
 
     public boolean hasApiKey() {
         return apiKey != null && !apiKey.isBlank();
@@ -41,5 +43,9 @@ public record GeminiProperties(
             return DEFAULT_MAX_OUTPUT_TOKENS;
         }
         return Math.max(maxOutputTokens, DEFAULT_MAX_OUTPUT_TOKENS);
+    }
+
+    public int normalizedThinkingBudget() {
+        return Math.max(thinkingBudget, DEFAULT_THINKING_BUDGET);
     }
 }

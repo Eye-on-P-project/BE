@@ -24,11 +24,13 @@ public class GeminiAgentClient {
 
     private static final String SYSTEM_INSTRUCTION = """
             너는 Eye-On 서비스의 졸음 방지 AI 동승자다.
-            운전자를 방해하지 않게 한국어로 아주 짧고 자연스럽게 말한다.
-            응답은 보통 2문장, 사용자가 농담이나 이야기를 요청하면 최대 3문장까지 가능하다.
-            사용자가 재미있는 이야기나 농담을 요청하면 짧고 밝은 이야기를 먼저 해준다.
-            졸음이나 수면 위험이 있으면 대화보다 환기, 휴식, 안전한 정차를 권한다.
-            의학적 진단, 긴 설명, 복잡한 행동 요구는 하지 않는다.
+            너의 역할은 옆좌석의 친근한 동승자처럼 자연스럽게 대화하며 운전자의 졸음을 줄이는 것이다.
+            한국어로 말하고, 딱딱한 상담사나 경고문처럼 말하지 않는다.
+            사용자가 농담, 잡담, 이야기, 질문을 하면 가능한 한 먼저 짧고 재밌게 받아준다.
+            일반적인 대화 요청에는 회피하지 말고 자연스럽게 답한다.
+            단, 운전자가 졸리다고 말하거나 상태가 DROWSY/SLEEP이면 답변 끝에 안전하게 환기, 휴식, 정차를 부드럽게 권한다.
+            응답은 보통 2~4문장으로 한다. 너무 길게 설교하지 않는다.
+            불법, 위험 행동을 유도하는 요청은 따르지 말고 안전한 대안을 말한다.
             """;
 
     private final GeminiProperties geminiProperties;
@@ -44,9 +46,10 @@ public class GeminiAgentClient {
         try {
             String userPrompt = createUserPrompt(drivingState, message);
             log.info(
-                    "Gemini agent request model={}, maxOutputTokens={}, drivingState={}, promptChars={}, prompt={}",
+                    "Gemini agent request model={}, maxOutputTokens={}, thinkingBudget={}, drivingState={}, promptChars={}, prompt={}",
                     geminiProperties.normalizedModel(),
                     geminiProperties.normalizedMaxOutputTokens(),
+                    geminiProperties.normalizedThinkingBudget(),
                     drivingState,
                     userPrompt.length(),
                     printable(userPrompt)
@@ -68,17 +71,18 @@ public class GeminiAgentClient {
 
             GeminiExtractedReply reply = extractReply(response.body());
             if (reply.text().isBlank()) {
-                log.warn("Gemini agent reply was empty. finishReason={}, promptTokens={}, candidateTokens={}, totalTokens={}",
-                        reply.finishReason(), reply.promptTokenCount(), reply.candidateTokenCount(), reply.totalTokenCount());
+                log.warn("Gemini agent reply was empty. finishReason={}, promptTokens={}, candidateTokens={}, thoughtsTokens={}, totalTokens={}",
+                        reply.finishReason(), reply.promptTokenCount(), reply.candidateTokenCount(), reply.thoughtsTokenCount(), reply.totalTokenCount());
                 return fallbackReply(drivingState, "FALLBACK_EMPTY_REPLY");
             }
             String sanitizedReply = sanitize(reply.text());
             log.info(
-                    "Gemini agent reply source=GEMINI, finishReason={}, chars={}, promptTokens={}, candidateTokens={}, totalTokens={}, reply={}",
+                    "Gemini agent reply source=GEMINI, finishReason={}, chars={}, promptTokens={}, candidateTokens={}, thoughtsTokens={}, totalTokens={}, reply={}",
                     reply.finishReason(),
                     sanitizedReply.length(),
                     reply.promptTokenCount(),
                     reply.candidateTokenCount(),
+                    reply.thoughtsTokenCount(),
                     reply.totalTokenCount(),
                     sanitizedReply
             );
@@ -122,6 +126,8 @@ public class GeminiAgentClient {
         generationConfig.put("temperature", 0.7);
         generationConfig.put("topP", 0.9);
         generationConfig.put("maxOutputTokens", geminiProperties.normalizedMaxOutputTokens());
+        generationConfig.putObject("thinkingConfig")
+                .put("thinkingBudget", geminiProperties.normalizedThinkingBudget());
 
         return objectMapper.writeValueAsString(root);
     }
@@ -131,8 +137,9 @@ public class GeminiAgentClient {
                 현재 운전자 상태: %s
                 사용자 말: %s
 
-                지금 상황에 맞게 동승자처럼 짧게 답해줘.
-                사용자가 재미있는 얘기나 농담을 요청했다면, 안전을 해치지 않는 짧은 농담이나 이야기를 해줘.
+                지금 상황에 맞게 옆자리 동승자처럼 자연스럽게 답해줘.
+                사용자가 재미있는 얘기나 농담을 요청했다면, 먼저 짧고 밝은 농담이나 이야기를 해줘.
+                사용자가 졸리다고 말했거나 상태가 DROWSY/SLEEP이면 마지막에 쉬어가자는 말을 부드럽게 붙여줘.
                 """.formatted(drivingState, message.trim());
     }
 
@@ -151,6 +158,7 @@ public class GeminiAgentClient {
                     finishReason,
                     usageMetadata.path("promptTokenCount").asInt(-1),
                     usageMetadata.path("candidatesTokenCount").asInt(-1),
+                    usageMetadata.path("thoughtsTokenCount").asInt(-1),
                     usageMetadata.path("totalTokenCount").asInt(-1)
             );
         }
@@ -170,16 +178,17 @@ public class GeminiAgentClient {
                 finishReason,
                 usageMetadata.path("promptTokenCount").asInt(-1),
                 usageMetadata.path("candidatesTokenCount").asInt(-1),
+                usageMetadata.path("thoughtsTokenCount").asInt(-1),
                 usageMetadata.path("totalTokenCount").asInt(-1)
         );
     }
 
     private String sanitize(String reply) {
         String compactReply = reply.replaceAll("\\s+", " ").trim();
-        if (compactReply.length() <= 180) {
+        if (compactReply.length() <= 420) {
             return compactReply;
         }
-        return compactReply.substring(0, 180).trim() + "...";
+        return compactReply.substring(0, 420).trim() + "...";
     }
 
     private String printable(String text) {
@@ -204,6 +213,7 @@ public class GeminiAgentClient {
             String finishReason,
             int promptTokenCount,
             int candidateTokenCount,
+            int thoughtsTokenCount,
             int totalTokenCount
     ) {
     }

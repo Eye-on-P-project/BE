@@ -80,6 +80,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -120,10 +121,15 @@ jobs:
 
           for _ in {1..30}; do
             if nc -z 127.0.0.1 2222; then
+              TUNNEL_READY=true
               break
             fi
             sleep 1
           done
+          if [ "${TUNNEL_READY:-false}" != "true" ]; then
+            echo "IAP tunnel did not become ready in time"
+            exit 1
+          fi
 
           APP_DIR="${DEPLOY_APP_DIR:-/opt/eyeon-be}"
           SERVICE_NAME="${SYSTEMD_SERVICE_NAME:-eyeon-be.service}"
@@ -167,5 +173,7 @@ jobs:
             -p 2222 \
             -o StrictHostKeyChecking=no \
             -o UserKnownHostsFile=/dev/null \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=4 \
             "${GCP_USER}@127.0.0.1" \
             "APP_DIR='${APP_DIR}' BRANCH='main' SERVICE_NAME='${SERVICE_NAME}' bash -s" < "${REMOTE_SCRIPT}"

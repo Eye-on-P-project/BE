@@ -4,6 +4,7 @@ set -Eeuo pipefail
 APP_DIR="${APP_DIR:-/opt/eyeon-be}"
 BRANCH="${BRANCH:-main}"
 SERVICE_NAME="${SERVICE_NAME:-eyeon-be.service}"
+BUILD_TIMEOUT_SECONDS="${BUILD_TIMEOUT_SECONDS:-900}"
 
 echo "[deploy] app_dir=${APP_DIR}, branch=${BRANCH}, service=${SERVICE_NAME}"
 
@@ -30,7 +31,17 @@ else
 fi
 
 echo "[deploy] 3) Build bootJar"
-./gradlew clean bootJar --no-daemon
+GRADLE_BUILD_ARGS=(bootJar --no-daemon --max-workers=1 -Dorg.gradle.jvmargs=-Xmx768m)
+if command -v timeout >/dev/null 2>&1; then
+  timeout "${BUILD_TIMEOUT_SECONDS}" ./gradlew "${GRADLE_BUILD_ARGS[@]}"
+else
+  ./gradlew "${GRADLE_BUILD_ARGS[@]}"
+fi
+
+if ! compgen -G "build/libs/*.jar" >/dev/null; then
+  echo "[deploy] ERROR: build/libs/*.jar was not created"
+  exit 1
+fi
 
 echo "[deploy] 4) Restart service"
 sudo systemctl restart "${SERVICE_NAME}"

@@ -8,9 +8,11 @@ import ac.jwooo.eye_on.domain.agent.domain.service.GeminiAgentClient;
 import ac.jwooo.eye_on.global.exception.CustomException;
 import ac.jwooo.eye_on.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class ChatWithAgentUseCase {
@@ -24,7 +26,23 @@ public class ChatWithAgentUseCase {
             throw new CustomException(ErrorCode.AGENT_SUBSCRIPTION_REQUIRED);
         }
 
+        log.info(
+                "Agent chat request userId={}, drivingState={}, chars={}, message={}",
+                userId,
+                request.drivingState(),
+                request.message().length(),
+                printable(request.message())
+        );
+
         GeminiAgentReply reply = geminiAgentClient.generateReply(request.drivingState(), request.message());
         return new AgentChatResponse(reply.text(), reply.source());
+    }
+
+    private String printable(String text) {
+        String compactText = text.replaceAll("\\s+", " ").trim();
+        if (compactText.length() <= 500) {
+            return compactText;
+        }
+        return compactText.substring(0, 500).trim() + "...";
     }
 }

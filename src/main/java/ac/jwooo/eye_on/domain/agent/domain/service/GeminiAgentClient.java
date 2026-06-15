@@ -6,6 +6,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.List;
+import java.util.Optional;
 
 import ac.jwooo.eye_on.domain.agent.domain.entity.AgentDrivingState;
 import ac.jwooo.eye_on.global.config.GeminiProperties;
@@ -13,6 +15,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.auth.oauth2.AccessToken;
+import com.google.auth.oauth2.GoogleCredentials;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,6 +26,10 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class GeminiAgentClient {
 
+    private static final int MAX_GEMINI_ATTEMPTS = 2;
+    private static final Duration RETRY_DELAY = Duration.ofMillis(400);
+    private static final String CLOUD_PLATFORM_SCOPE = "https://www.googleapis.com/auth/cloud-platform";
+    private static final URI GCE_PROJECT_ID_URI = URI.create("http://metadata.google.internal/computeMetadata/v1/project/project-id");
     private static final String SYSTEM_INSTRUCTION = """
             너는 Eye-On 서비스의 졸음 방지 AI 동승자다.
             너의 역할은 옆좌석의 친근한 동승자처럼 자연스럽게 대화하며 운전자의 졸음을 줄이는 것이다.
@@ -36,9 +44,11 @@ public class GeminiAgentClient {
     private final GeminiProperties geminiProperties;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newHttpClient();
+    private volatile GoogleCredentials vertexCredentials;
+    private volatile String discoveredProjectId;
 
     public GeminiAgentReply generateReply(AgentDrivingState drivingState, String message) {
-        if (!geminiProperties.hasApiKey()) {
+        if (!geminiProperties.isVertexProvider() && !geminiProperties.hasApiKey()) {
             log.warn("Gemini API key is not configured. Returning fallback agent reply.");
             return fallbackReply(drivingState, "FALLBACK_NO_API_KEY");
         }
@@ -46,7 +56,8 @@ public class GeminiAgentClient {
         try {
             String userPrompt = createUserPrompt(drivingState, message);
             log.info(
-                    "Gemini agent request model={}, maxOutputTokens={}, thinkingBudget={}, drivingState={}, promptChars={}, prompt={}",
+                    "Gemini agent request provider={}, model={}, maxOutputTokens={}, thinkingBudget={}, drivingState={}, promptChars={}, prompt={}",
+                    geminiProperties.normalizedProvider(),
                     geminiProperties.normalizedModel(),
                     geminiProperties.normalizedMaxOutputTokens(),
                     geminiProperties.normalizedThinkingBudget(),
@@ -55,15 +66,7 @@ public class GeminiAgentClient {
                     printable(userPrompt)
             );
 
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(geminiUri())
-                    .timeout(Duration.ofSeconds(geminiProperties.normalizedTimeoutSeconds()))
-                    .header("Content-Type", "application/json")
-                    .header("x-goog-api-key", geminiProperties.apiKey())
-                    .POST(HttpRequest.BodyPublishers.ofString(createRequestBody(userPrompt)))
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = sendGeminiRequest(createRequestBody(userPrompt));
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 log.warn("Gemini API returned non-2xx status. status={}, body={}", response.statusCode(), response.body());
                 return fallbackReply(drivingState, "FALLBACK_GEMINI_HTTP_" + response.statusCode());
@@ -77,7 +80,8 @@ public class GeminiAgentClient {
             }
             String sanitizedReply = sanitize(reply.text());
             log.info(
-                    "Gemini agent reply source=GEMINI, finishReason={}, chars={}, promptTokens={}, candidateTokens={}, thoughtsTokens={}, totalTokens={}, reply={}",
+                    "Gemini agent reply source={}, finishReason={}, chars={}, promptTokens={}, candidateTokens={}, thoughtsTokens={}, totalTokens={}, reply={}",
+                    geminiProperties.replySource(),
                     reply.finishReason(),
                     sanitizedReply.length(),
                     reply.promptTokenCount(),
@@ -86,7 +90,7 @@ public class GeminiAgentClient {
                     reply.totalTokenCount(),
                     sanitizedReply
             );
-            return new GeminiAgentReply(sanitizedReply, "GEMINI");
+            return new GeminiAgentReply(sanitizedReply, geminiProperties.replySource());
         } catch (IOException e) {
             log.warn("Failed to call Gemini API.", e);
             return fallbackReply(drivingState, "FALLBACK_IO_ERROR");
@@ -100,11 +104,136 @@ public class GeminiAgentClient {
         }
     }
 
-    private URI geminiUri() {
+    private HttpResponse<String> sendGeminiRequest(String requestBody) throws IOException, InterruptedException {
+        for (int attempt = 1; attempt <= MAX_GEMINI_ATTEMPTS; attempt++) {
+            HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+                    .uri(geminiUri())
+                    .timeout(Duration.ofSeconds(geminiProperties.normalizedTimeoutSeconds()))
+                    .header("Content-Type", "application/json");
+            addAuthHeader(requestBuilder);
+
+            HttpRequest request = requestBuilder
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (!isRetryableStatus(response.statusCode()) || attempt == MAX_GEMINI_ATTEMPTS) {
+                return response;
+            }
+
+            log.warn(
+                    "Gemini API returned retryable status. attempt={}, status={}, delayMillis={}, body={}",
+                    attempt,
+                    response.statusCode(),
+                    RETRY_DELAY.toMillis(),
+                    response.body()
+            );
+            Thread.sleep(RETRY_DELAY.toMillis());
+        }
+        throw new IOException("Gemini request retry loop exited unexpectedly.");
+    }
+
+    private boolean isRetryableStatus(int statusCode) {
+        return statusCode == 429 || statusCode == 503;
+    }
+
+    private URI geminiUri() throws IOException, InterruptedException {
+        if (geminiProperties.isVertexProvider()) {
+            return vertexGeminiUri();
+        }
         return URI.create("%s/%s:generateContent".formatted(
                 geminiProperties.normalizedEndpoint(),
                 geminiProperties.normalizedModel()
         ));
+    }
+
+    private URI vertexGeminiUri() throws IOException, InterruptedException {
+        String projectId = resolveVertexProjectId();
+        if (projectId.isBlank()) {
+            throw new IOException("GCP project ID is not configured and could not be discovered from metadata server.");
+        }
+        return URI.create("%s/projects/%s/locations/%s/publishers/google/models/%s:generateContent".formatted(
+                geminiProperties.normalizedVertexEndpoint(),
+                projectId,
+                geminiProperties.normalizedLocation(),
+                geminiProperties.normalizedModel()
+        ));
+    }
+
+    private void addAuthHeader(HttpRequest.Builder requestBuilder) throws IOException {
+        if (geminiProperties.isVertexProvider()) {
+            requestBuilder.header("Authorization", "Bearer " + vertexAccessToken());
+            return;
+        }
+        requestBuilder.header("x-goog-api-key", geminiProperties.apiKey());
+    }
+
+    private String vertexAccessToken() throws IOException {
+        GoogleCredentials credentials = vertexCredentials();
+        credentials.refreshIfExpired();
+        AccessToken accessToken = credentials.getAccessToken();
+        if (accessToken == null || accessToken.getTokenValue() == null || accessToken.getTokenValue().isBlank()) {
+            credentials.refresh();
+            accessToken = credentials.getAccessToken();
+        }
+        if (accessToken == null || accessToken.getTokenValue() == null || accessToken.getTokenValue().isBlank()) {
+            throw new IOException("Could not load a GCP access token for Vertex AI.");
+        }
+        return accessToken.getTokenValue();
+    }
+
+    private GoogleCredentials vertexCredentials() throws IOException {
+        GoogleCredentials credentials = vertexCredentials;
+        if (credentials != null) {
+            return credentials;
+        }
+        synchronized (this) {
+            if (vertexCredentials == null) {
+                credentials = GoogleCredentials.getApplicationDefault();
+                if (credentials.createScopedRequired()) {
+                    credentials = credentials.createScoped(List.of(CLOUD_PLATFORM_SCOPE));
+                }
+                vertexCredentials = credentials;
+            }
+            return vertexCredentials;
+        }
+    }
+
+    private String resolveVertexProjectId() throws IOException, InterruptedException {
+        if (geminiProperties.hasConfiguredProjectId()) {
+            return geminiProperties.normalizedProjectId();
+        }
+        String projectId = discoveredProjectId;
+        if (projectId != null) {
+            return projectId;
+        }
+        synchronized (this) {
+            if (discoveredProjectId == null) {
+                discoveredProjectId = discoverProjectIdFromMetadata().orElse("");
+            }
+            return discoveredProjectId;
+        }
+    }
+
+    private Optional<String> discoverProjectIdFromMetadata() throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(GCE_PROJECT_ID_URI)
+                .timeout(Duration.ofSeconds(2))
+                .header("Metadata-Flavor", "Google")
+                .GET()
+                .build();
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            log.warn("Could not discover GCP project ID from metadata server. status={}", response.statusCode());
+            return Optional.empty();
+        }
+        String projectId = response.body().trim();
+        if (projectId.isBlank()) {
+            log.warn("GCP metadata server returned an empty project ID.");
+            return Optional.empty();
+        }
+        log.info("Discovered GCP project ID from metadata server for Vertex AI Gemini.");
+        return Optional.of(projectId);
     }
 
     private String createRequestBody(String userPrompt) throws IOException {
